@@ -110,8 +110,8 @@ class AuthController extends Controller
             ->leftJoin('students', 'messages.message_sender', '=', 'students.LRN')
             ->leftJoin('admins', 'messages.message_reciever', '=', 'admins.admin_id')
             ->joinSub($latestMessages, 'latest_messages', function ($join) {
-                $join->on('messages.message_sender', '=', 'latest_messages.message_sender');
-                    //  ->on('messages.created_at', '=', 'latest_messages.max_created_at');
+                $join->on('messages.message_sender', '=', 'latest_messages.message_sender')
+                     ->on('messages.created_at', '=', 'latest_messages.max_created_at');
             })
             ->whereNotIn('messages.message_sender', function ($query) {
                 $query->select('admin_id')->from('admins');
@@ -659,8 +659,8 @@ class AuthController extends Controller
                 $join->on('messages.message_sender', '=', 'parent_guardians.guardian_id');
             })
             ->joinSub($latestMessages, 'latest_messages', function ($join) {
-                $join->on('messages.message_sender', '=', 'latest_messages.message_sender');
-                    //  ->on('messages.created_at', '=', 'latest_messages.max_created_at');
+                $join->on('messages.message_sender', '=', 'latest_messages.message_sender')
+                    ->on('messages.created_at', '=', 'latest_messages.max_created_at');
             })
             ->whereNotIn('messages.message_sender', function ($query) {
                 $query->select('admin_id')->from('admins');
