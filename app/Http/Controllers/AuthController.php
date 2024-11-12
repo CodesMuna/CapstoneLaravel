@@ -643,7 +643,9 @@ class AuthController extends Controller
 
     // Message Functions
 
-    public function getMessages(){
+    public function getMessages(Request $request){
+        $uid = $request->input('uid');
+
         $latestMessages = DB::table('messages')
             ->select('message_sender', DB::raw('MAX(created_at) as max_created_at'))
             ->groupBy('message_sender');
@@ -652,9 +654,9 @@ class AuthController extends Controller
             ->leftJoin('students', function ($join) {
                 $join->on('messages.message_sender', '=', 'students.LRN');
             })
-            ->leftJoin('admins', function ($join) {
-                $join->on('messages.message_sender', '=', 'admins.admin_id');
-            })
+            // ->leftJoin('admins', function ($join) {
+            //     $join->on('messages.message_sender', '=', 'admins.admin_id');
+            // })
             ->leftJoin('parent_guardians', function ($join) {
                 $join->on('messages.message_sender', '=', 'parent_guardians.guardian_id');
             })
@@ -665,10 +667,10 @@ class AuthController extends Controller
             ->whereNotIn('messages.message_sender', function ($query) {
                 $query->select('admin_id')->from('admins');
             })
+            ->where('messages.message_reciever', '=', $uid)
             ->select('messages.*', 
                 DB::raw('CASE 
                     WHEN messages.message_sender IN (SELECT LRN FROM students) THEN CONCAT(students.fname, " ",LEFT(students.mname, 1), ". ", students.lname)
-                    WHEN messages.message_sender IN (SELECT admin_id FROM admins) THEN CONCAT(admins.fname, " ",LEFT(admins.mname, 1), ". ", admins.lname)
                     WHEN messages.message_sender IN (SELECT guardian_id FROM parent_guardians) THEN CONCAT(parent_guardians.fname, " ",LEFT(parent_guardians.mname, 1), ". ", parent_guardians.lname)
                 END as sender_name'))
             ->orderBy('messages.created_at', 'desc')
@@ -677,7 +679,43 @@ class AuthController extends Controller
         return $msg;
     }
 
-    public function getConvo($sid){
+    // public function getMessages(){
+    //     $latestMessages = DB::table('messages')
+    //         ->select('message_sender', DB::raw('MAX(created_at) as max_created_at'))
+    //         ->groupBy('message_sender');
+    
+    //     $msg = DB::table('messages')
+    //         ->leftJoin('students', function ($join) {
+    //             $join->on('messages.message_sender', '=', 'students.LRN');
+    //         })
+    //         ->leftJoin('admins', function ($join) {
+    //             $join->on('messages.message_sender', '=', 'admins.admin_id');
+    //         })
+    //         ->leftJoin('parent_guardians', function ($join) {
+    //             $join->on('messages.message_sender', '=', 'parent_guardians.guardian_id');
+    //         })
+    //         ->joinSub($latestMessages, 'latest_messages', function ($join) {
+    //             $join->on('messages.message_sender', '=', 'latest_messages.message_sender')
+    //                 ->on('messages.created_at', '=', 'latest_messages.max_created_at');
+    //         })
+    //         ->whereNotIn('messages.message_sender', function ($query) {
+    //             $query->select('admin_id')->from('admins');
+    //         })
+    //         ->select('messages.*', 
+    //             DB::raw('CASE 
+    //                 WHEN messages.message_sender IN (SELECT LRN FROM students) THEN CONCAT(students.fname, " ",LEFT(students.mname, 1), ". ", students.lname)
+    //                 WHEN messages.message_sender IN (SELECT admin_id FROM admins) THEN CONCAT(admins.fname, " ",LEFT(admins.mname, 1), ". ", admins.lname)
+    //                 WHEN messages.message_sender IN (SELECT guardian_id FROM parent_guardians) THEN CONCAT(parent_guardians.fname, " ",LEFT(parent_guardians.mname, 1), ". ", parent_guardians.lname)
+    //             END as sender_name'))
+    //         ->orderBy('messages.created_at', 'desc')
+    //         ->get();
+        
+    //     return $msg;
+    // }
+
+    public function getConvo(Request $request, $sid){
+        $uid = $request->input('uid');
+
         $convo = DB::table('messages')
             ->leftJoin('students', function ($join) {
                 $join->on('messages.message_sender', '=', 'students.LRN');
@@ -688,11 +726,14 @@ class AuthController extends Controller
             ->leftJoin('parent_guardians', function ($join) {
                 $join->on('messages.message_sender', '=', 'parent_guardians.guardian_id');
             })
-            
+            ->where(function ($query) use ($uid) {
+                $query->where('messages.message_sender', $uid) // Sent messages
+                      ->orWhere('messages.message_reciever', $uid); // Received replies
+            })     
             ->where(function ($query) use ($sid) {
                 $query->where('messages.message_sender', $sid) // Sent messages
                       ->orWhere('messages.message_reciever', $sid); // Received replies
-            })
+            })        
             ->select('messages.*', 
                 DB::raw('CASE 
                     WHEN messages.message_sender IN (SELECT LRN FROM students) THEN CONCAT(students.fname, " ",LEFT(students.mname, 1), ". ", students.lname)
