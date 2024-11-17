@@ -16,7 +16,9 @@ return new class extends Migration
             $table->foreignId('admin_id');
             $table->foreignId('section_id');
             $table->foreignId('subject_id');
+            $table->string('room');
             $table->string('schedule');
+            $table->string('time');
             $table->timestamps();
         });
     }

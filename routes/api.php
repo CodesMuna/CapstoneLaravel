@@ -71,6 +71,8 @@ Route::get('/getClassGrades', [AuthController::class, 'getClassGrades']);
 Route::get('/allenrollments', [AuthController::class, 'allenrollments']);
 Route::get('/getSubjectRosters', [AuthController::class, 'getSubjectRosters']);
 Route::get('/getGrades/{lrn}/{syr}', [AuthController::class, 'getGrades']);
+Route::post('/permit', [AuthController::class, 'permit']);
+Route::post('/decline', [AuthController::class, 'decline']);
 
 //Message Routes
 
@@ -79,6 +81,7 @@ Route::get('/message', [AuthController::class, 'message']);
 Route::get('/getConvo/{sid}', [AuthController::class, 'getConvo']);
 Route::get('/displaymsg', [AuthController::class, 'displaymsg']);
 Route::post('/sendMessage', [AuthController::class, 'sendMessage']);
+Route::get('/getStudentParents', [AuthController::class, 'getStudentParents']);
 
 // Enrollment/Students Routes
 

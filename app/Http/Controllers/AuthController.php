@@ -136,6 +136,7 @@ class AuthController extends Controller
         $enrollments = DB::table('enrollments')
                         ->leftJoin('students', 'enrollments.LRN', '=', 'students.LRN')
                         ->where('enrollments.school_year', '=', $schoolYear)
+                        ->where('enrollments.date_register', '!=', null)
                         ->select('enrollments.*', 'students.*', DB::raw('CONCAT(students.fname, " ",LEFT(students.mname, 1), ". ", students.lname)as full_name'))
                         ->get();
                         
@@ -473,6 +474,7 @@ class AuthController extends Controller
     
         $grades = DB::table('rosters')
             ->join('students', 'rosters.LRN', '=', 'students.LRN')
+            ->join('enrollments', 'students.LRN', '=', 'enrollments.LRN')
             ->join('classes', 'rosters.class_id', '=', 'classes.class_id')
             ->join('admins', 'classes.admin_id', '=', 'admins.admin_id')
             ->join('sections', 'classes.section_id', '=', 'sections.section_id')
@@ -498,14 +500,23 @@ class AuthController extends Controller
                 'subjects.subject_id',
                 'subjects.subject_name',
                 'subjects.strand',
+                'enrollments.school_year',
                 DB::raw(
                     "MAX(CASE WHEN grades.term = '1st Quarter' THEN grades.grade ELSE NULL END) AS grade_Q1,
+                     MAX(CASE WHEN grades.term = '1st Quarter' THEN grades.permission ELSE NULL END) AS permission_Q1,
+                     MAX(CASE WHEN grades.term = '1st Quarter' THEN grades.grade_id ELSE NULL END) AS grade_id_Q1,
                      MAX(CASE WHEN grades.term = '2nd Quarter' THEN grades.grade ELSE NULL END) AS grade_Q2,
+                     MAX(CASE WHEN grades.term = '2nd Quarter' THEN grades.permission ELSE NULL END) AS permission_Q2,
+                     MAX(CASE WHEN grades.term = '2nd Quarter' THEN grades.grade_id ELSE NULL END) AS grade_id_Q2,
                      MAX(CASE WHEN grades.term = '3rd Quarter' THEN grades.grade ELSE NULL END) AS grade_Q3,
-                     MAX(CASE WHEN grades.term = '4th Quarter' THEN grades.grade ELSE NULL END) AS grade_Q4"
+                     MAX(CASE WHEN grades.term = '3rd Quarter' THEN grades.permission ELSE NULL END) AS permission_Q3,
+                     MAX(CASE WHEN grades.term = '3rd Quarter' THEN grades.grade_id ELSE NULL END) AS grade_id_Q3,
+                     MAX(CASE WHEN grades.term = '4th Quarter' THEN grades.grade ELSE NULL END) AS grade_Q4,
+                     MAX(CASE WHEN grades.term = '4th Quarter' THEN grades.permission ELSE NULL END) AS permission_Q4,
+                     MAX(CASE WHEN grades.term = '4th Quarter' THEN grades.grade_id ELSE NULL END) AS grade_id_Q4"
                 )
             )
-            ->groupBy('students.LRN', 'student_name', 'students.gender', 'students.contact_no', 'subjects.subject_id', 'subjects.subject_name', 'subjects.strand')
+            ->groupBy('students.LRN', 'student_name', 'students.gender', 'students.contact_no', 'subjects.subject_id', 'subjects.subject_name', 'subjects.strand', 'enrollments.school_year',)
             ->orderByRaw("CASE WHEN students.gender = 'MALE' THEN 0 ELSE 1 END")
             ->orderBy('students.lname')
             ->get();
@@ -541,6 +552,34 @@ class AuthController extends Controller
             ->get();
         
         return $rosters;
+    }
+
+    public function permit(Request $request) {
+        $gid = $request->input('gid'); // Get gid from request
+        if (!$gid) {
+            return response()->json(['error' => 'Grade ID is required'], 400);
+        }
+    
+      
+            DB::table('grades')
+                ->where('grade_id', $gid)
+                ->update(['permission' => 'Permitted']);
+    
+            return response()->json(['success' => 'Grade permission updated successfully']);
+    }
+
+    public function decline(Request $request){
+        $gid = $request->input('gid'); // Get gid from request
+        if (!$gid) {
+            return response()->json(['error' => 'Grade ID is required'], 400);
+        }
+    
+      
+            DB::table('grades')
+                ->where('grade_id', $gid)
+                ->update(['permission' => null]);
+    
+            return response()->json(['success' => 'Grade permission updated successfully']);
     }
 
     // public function getSubjectRosters(Request $request){
@@ -643,80 +682,49 @@ class AuthController extends Controller
 
     // Message Functions
 
-    public function getMessages(Request $request){
-        $uid = $request->input('uid');
+    public function getStudentParents() {
+        // Fetch students
+        $students = DB::table('students')
+            ->select('students.LRN', DB::raw('CONCAT(students.fname, " ", LEFT(students.mname, 1), ". ", students.lname) as account_name'))
+            ->get()
+            ->map(function ($student) {
+                return [
+                    'account_id' => $student->LRN,
+                    'account_name' => $student->account_name,
+                    'type' => 'student',
+                ];
+            });
 
+        // Fetch parents
+        $parents = DB::table('parent_guardians')
+            ->select('parent_guardians.guardian_id', DB::raw('CONCAT(parent_guardians.fname, " ", LEFT(parent_guardians.mname, 1), ". ", parent_guardians.lname) as account_name'))
+            ->get()
+            ->map(function ($parent) {
+                return [
+                    'account_id' => $parent->guardian_id,
+                    'account_name' => $parent->account_name,
+                    'type' => 'parent',
+                ];
+            });
+
+        // Combine both collections into one
+        $accounts = $students->merge($parents);
+
+        return response()->json($accounts);
+    }
+
+  
+
+    public function getMessages(Request $request) {
+        $uid = $request->input('uid');
+    
+        // Subquery to get the latest message for each sender
         $latestMessages = DB::table('messages')
             ->select('message_sender', DB::raw('MAX(created_at) as max_created_at'))
             ->groupBy('message_sender');
     
+        // Main query to get messages
         $msg = DB::table('messages')
-            ->leftJoin('students', function ($join) {
-                $join->on('messages.message_sender', '=', 'students.LRN');
-            })
-            // ->leftJoin('admins', function ($join) {
-            //     $join->on('messages.message_sender', '=', 'admins.admin_id');
-            // })
-            ->leftJoin('parent_guardians', function ($join) {
-                $join->on('messages.message_sender', '=', 'parent_guardians.guardian_id');
-            })
-            ->joinSub($latestMessages, 'latest_messages', function ($join) {
-                $join->on('messages.message_sender', '=', 'latest_messages.message_sender')
-                    ->on('messages.created_at', '=', 'latest_messages.max_created_at');
-            })
-            ->whereNotIn('messages.message_sender', function ($query) {
-                $query->select('admin_id')->from('admins');
-            })
-            ->where('messages.message_reciever', '=', $uid)
-            ->select('messages.*', 
-                DB::raw('CASE 
-                    WHEN messages.message_sender IN (SELECT LRN FROM students) THEN CONCAT(students.fname, " ",LEFT(students.mname, 1), ". ", students.lname)
-                    WHEN messages.message_sender IN (SELECT guardian_id FROM parent_guardians) THEN CONCAT(parent_guardians.fname, " ",LEFT(parent_guardians.mname, 1), ". ", parent_guardians.lname)
-                END as sender_name'))
-            ->orderBy('messages.created_at', 'desc')
-            ->get();
-        
-        return $msg;
-    }
-
-    // public function getMessages(){
-    //     $latestMessages = DB::table('messages')
-    //         ->select('message_sender', DB::raw('MAX(created_at) as max_created_at'))
-    //         ->groupBy('message_sender');
-    
-    //     $msg = DB::table('messages')
-    //         ->leftJoin('students', function ($join) {
-    //             $join->on('messages.message_sender', '=', 'students.LRN');
-    //         })
-    //         ->leftJoin('admins', function ($join) {
-    //             $join->on('messages.message_sender', '=', 'admins.admin_id');
-    //         })
-    //         ->leftJoin('parent_guardians', function ($join) {
-    //             $join->on('messages.message_sender', '=', 'parent_guardians.guardian_id');
-    //         })
-    //         ->joinSub($latestMessages, 'latest_messages', function ($join) {
-    //             $join->on('messages.message_sender', '=', 'latest_messages.message_sender')
-    //                 ->on('messages.created_at', '=', 'latest_messages.max_created_at');
-    //         })
-    //         ->whereNotIn('messages.message_sender', function ($query) {
-    //             $query->select('admin_id')->from('admins');
-    //         })
-    //         ->select('messages.*', 
-    //             DB::raw('CASE 
-    //                 WHEN messages.message_sender IN (SELECT LRN FROM students) THEN CONCAT(students.fname, " ",LEFT(students.mname, 1), ". ", students.lname)
-    //                 WHEN messages.message_sender IN (SELECT admin_id FROM admins) THEN CONCAT(admins.fname, " ",LEFT(admins.mname, 1), ". ", admins.lname)
-    //                 WHEN messages.message_sender IN (SELECT guardian_id FROM parent_guardians) THEN CONCAT(parent_guardians.fname, " ",LEFT(parent_guardians.mname, 1), ". ", parent_guardians.lname)
-    //             END as sender_name'))
-    //         ->orderBy('messages.created_at', 'desc')
-    //         ->get();
-        
-    //     return $msg;
-    // }
-
-    public function getConvo(Request $request, $sid){
-        $uid = $request->input('uid');
-
-        $convo = DB::table('messages')
             ->leftJoin('students', function ($join) {
                 $join->on('messages.message_sender', '=', 'students.LRN');
             })
@@ -726,26 +734,134 @@ class AuthController extends Controller
             ->leftJoin('parent_guardians', function ($join) {
                 $join->on('messages.message_sender', '=', 'parent_guardians.guardian_id');
             })
-            ->where(function ($query) use ($uid) {
-                $query->where('messages.message_sender', $uid) // Sent messages
-                      ->orWhere('messages.message_reciever', $uid); // Received replies
-            })     
-            ->where(function ($query) use ($sid) {
-                $query->where('messages.message_sender', $sid) // Sent messages
-                      ->orWhere('messages.message_reciever', $sid); // Received replies
-            })        
+            ->joinSub($latestMessages, 'latest_messages', function ($join) {
+                $join->on('messages.message_sender', '=', 'latest_messages.message_sender')
+                    ->on('messages.created_at', '=', 'latest_messages.max_created_at');
+            })
+            ->where('messages.message_reciever', '=', $uid) // Filter by receiver
             ->select('messages.*', 
                 DB::raw('CASE 
-                    WHEN messages.message_sender IN (SELECT LRN FROM students) THEN CONCAT(students.fname, " ",LEFT(students.mname, 1), ". ", students.lname)
-                    WHEN messages.message_sender IN (SELECT guardian_id FROM parent_guardians) THEN CONCAT(parent_guardians.fname, " ",LEFT(parent_guardians.mname, 1), ". ", parent_guardians.lname)
-                END as sender_name'),
-                DB::raw('CASE 
-                    WHEN messages.message_sender IN (SELECT admin_id FROM admins) THEN CONCAT(admins.fname, " ",LEFT(admins.mname, 1), ". ", admins.lname)
-                END as me'))
+                    WHEN messages.message_sender IN (SELECT LRN FROM students) THEN CONCAT(students.fname, " ", LEFT(students.mname, 1), ". ", students.lname)
+                    WHEN messages.message_sender IN (SELECT admin_id FROM admins) THEN CONCAT(admins.fname, " ", LEFT(admins.mname, 1), ". ", admins.lname)
+                    WHEN messages.message_sender IN (SELECT guardian_id FROM parent_guardians) THEN CONCAT(parent_guardians.fname, " ", LEFT(parent_guardians.mname, 1), ". ", parent_guardians.lname)
+                END as sender_name'))
+            ->orderBy('messages.created_at', 'desc')
             ->get();
-
-        return $convo;
+        
+        return $msg;
+        
     }
+
+    public function getConvo(Request $request, $sid) {
+        // Initialize the response variable
+        $user = null;
+    
+        // Check if the $sid corresponds to a student
+        $student = DB::table('students')
+            ->where('students.LRN', $sid)
+            ->select('students.LRN', DB::raw('CONCAT(students.fname, " ", LEFT(students.mname, 1), ". ", students.lname) as account_name'))
+            ->first(); // Use first() to get a single record
+    
+        if ($student) {
+            // If a student is found, format the response
+            $user = [
+                'account_id' => $student->LRN,
+                'account_name' => $student->account_name,
+                'type' => 'student',
+            ];
+        } else {
+            // If no student found, check for a parent
+            $parent = DB::table('parent_guardians')
+                ->where('parent_guardians.guardian_id', $sid)
+                ->select('parent_guardians.guardian_id', DB::raw('CONCAT(parent_guardians.fname, " ", LEFT(parent_guardians.mname, 1), ". ", parent_guardians.lname) as account_name'))
+                ->first(); // Use first() to get a single record
+    
+            if ($parent) {
+                // If a parent is found, format the response
+                $user = [
+                    'account_id' => $parent->guardian_id,
+                    'account_name' => $parent->account_name,
+                    'type' => 'parent',
+                ];
+            }
+        }
+    
+        // Initialize the conversation variable
+        $convo = [];
+    
+        // If user is found, fetch the conversation
+        if ($user) {
+            $uid = $request->input('uid');
+    
+            $convo = DB::table('messages')
+                ->leftJoin('students', function ($join) {
+                    $join->on('messages.message_sender', '=', 'students.LRN');
+                })
+                ->leftJoin('admins', function ($join) {
+                    $join->on('messages.message_sender', '=', 'admins.admin_id');
+                })
+                ->leftJoin('parent_guardians', function ($join) {
+                    $join->on('messages.message_sender', '=', 'parent_guardians.guardian_id');
+                })
+                ->where(function ($query) use ($uid) {
+                    $query->where('messages.message_sender', $uid) // Sent messages
+                          ->orWhere('messages.message_reciever', $uid); // Received replies
+                })     
+                ->where(function ($query) use ($sid) {
+                    $query->where('messages.message_sender', $sid) // Sent messages
+                          ->orWhere('messages.message_reciever', $sid); // Received replies
+                })        
+                ->select('messages.*', 
+                    DB::raw('CASE 
+                        WHEN messages.message_sender IN (SELECT LRN FROM students) THEN CONCAT(students.fname, " ", LEFT(students.mname, 1), ". ", students.lname)
+                        WHEN messages.message_sender IN (SELECT guardian_id FROM parent_guardians) THEN CONCAT(parent_guardians.fname, " ", LEFT(parent_guardians.mname, 1), ". ", parent_guardians.lname)
+                    END as sender_name'),
+                    DB::raw('CASE 
+                        WHEN messages.message_sender IN (SELECT admin_id FROM admins) THEN CONCAT(admins.fname, " ", LEFT(admins.mname, 1), ". ", admins.lname)
+                    END as me'))
+                ->get();
+        }
+    
+        // Return the user information and conversation or a not found message
+        return response()->json([
+            'user' => $user ?: ['message' => 'User  not found'],
+            'conversation' => $convo,
+        ]);
+    }
+
+    // public function getConvo(Request $request, $sid){
+    //     $uid = $request->input('uid');
+
+    //     $convo = DB::table('messages')
+    //         ->leftJoin('students', function ($join) {
+    //             $join->on('messages.message_sender', '=', 'students.LRN');
+    //         })
+    //         ->leftJoin('admins', function ($join) {
+    //             $join->on('messages.message_sender', '=', 'admins.admin_id');
+    //         })
+    //         ->leftJoin('parent_guardians', function ($join) {
+    //             $join->on('messages.message_sender', '=', 'parent_guardians.guardian_id');
+    //         })
+    //         ->where(function ($query) use ($uid) {
+    //             $query->where('messages.message_sender', $uid) // Sent messages
+    //                   ->orWhere('messages.message_reciever', $uid); // Received replies
+    //         })     
+    //         ->where(function ($query) use ($sid) {
+    //             $query->where('messages.message_sender', $sid) // Sent messages
+    //                   ->orWhere('messages.message_reciever', $sid); // Received replies
+    //         })        
+    //         ->select('messages.*', 
+    //             DB::raw('CASE 
+    //                 WHEN messages.message_sender IN (SELECT LRN FROM students) THEN CONCAT(students.fname, " ",LEFT(students.mname, 1), ". ", students.lname)
+    //                 WHEN messages.message_sender IN (SELECT guardian_id FROM parent_guardians) THEN CONCAT(parent_guardians.fname, " ",LEFT(parent_guardians.mname, 1), ". ", parent_guardians.lname)
+    //             END as sender_name'),
+    //             DB::raw('CASE 
+    //                 WHEN messages.message_sender IN (SELECT admin_id FROM admins) THEN CONCAT(admins.fname, " ",LEFT(admins.mname, 1), ". ", admins.lname)
+    //             END as me'))
+    //         ->get();
+
+    //     return $convo;
+    // }
 
     public function sendMessage(Request $request){
         $validator = Validator::make($request->all(), [
