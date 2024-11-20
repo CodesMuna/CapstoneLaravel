@@ -23,65 +23,77 @@ Route::get('/user', function (Request $request) {
 
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login']);
-Route::post('/logout', [AuthController::class, 'logout'])->middleware('auth:sanctum');
 
-Route::apiResource('admins', AdminController::class);
-Route::apiResource('students', StudentController::class);
 
-//Home Routes
-Route::get('/getInquiries', [AuthController::class, 'getInquiries']);
+// Route::apiResource('admins', AdminController::class);
+// Route::apiResource('students', StudentController::class);
 
-// Enrollment Routes
 
-Route::get('/enrollments', [AuthController::class, 'enrollments']);
-Route::get('/enrollmentinfo/{eid}', [AuthController::class, 'enrollmentinfo']);
-Route::post('/approval/{eid}', [AuthController::class, 'approval']);
-Route::delete('/deleteEnrollment/{eid}', [AuthController::class, 'deleteEnrollment']);
+// Route::middleware(['auth:sanctum'])->group(function () {
+//     Route::middleware(['Registrar'])->group(function () {
 
-//Classes Routes
+        Route::post('/logout', [AuthController::class, 'logout'])->middleware('auth:sanctum');
 
-Route::get('/getClasses', [AuthController::class, 'getClasses']);
+        //Home Routes
+        Route::get('/getInquiries', [AuthController::class, 'getInquiries']);
 
-//Classes Routes
+        // Enrollment Routes
 
-Route::get('/getSections', [AuthController::class, 'getSections']);
+        Route::get('/enrollments', [AuthController::class, 'enrollments']);
+        Route::get('/enrollmentinfo/{eid}', [AuthController::class, 'enrollmentinfo']);
+        Route::post('/approval/{eid}', [AuthController::class, 'approval']);
+        Route::delete('/deleteEnrollment/{eid}', [AuthController::class, 'deleteEnrollment']);
 
-//Roster Routes
+        //Classes Routes
 
-Route::post('/createRoster', [AuthController::class, 'createRoster']);
-Route::get('/getRosters', [AuthController::class, 'getRosters']);
-Route::get('/getFilteredRosters', [AuthController::class, 'getFilteredRosters']);
+        Route::get('/getClasses', [AuthController::class, 'getClasses']);
 
-//Rostering Routes
+        //Classes Routes
 
-// Route::get('/getClassInfo/{cid}', [AuthController::class, 'getClassInfo']);
-Route::get('/getClassInfo', [AuthController::class, 'getClassInfo']);
-// Route::get('/getRosterInfo/{cid}', [AuthController::class, 'getRosterInfo']);
-Route::get('/getRosterInfo', [AuthController::class, 'getRosterInfo']);
-Route::post('/addStudent', [AuthController::class, 'addStudent']);
-// Route::delete('/removeStudent/{rid}', [AuthController::class, 'removeStudent']);
-Route::delete('/removeStudent', [AuthController::class, 'removeStudent']);
-Route::get('/getEnrolees/{lvl}', [AuthController::class, 'getEnrolees']);
+        Route::get('/getSections', [AuthController::class, 'getSections']);
 
-Route::get('/getClass', [AuthController::class, 'getClass']);
+        //Roster Routes
 
-//Grades Routes
+        Route::post('/createRoster', [AuthController::class, 'createRoster']);
+        Route::get('/getRosters', [AuthController::class, 'getRosters']);
+        Route::get('/getFilteredRosters', [AuthController::class, 'getFilteredRosters']);
 
-Route::get('/getClassGrades', [AuthController::class, 'getClassGrades']);
-Route::get('/allenrollments', [AuthController::class, 'allenrollments']);
-Route::get('/getSubjectRosters', [AuthController::class, 'getSubjectRosters']);
-Route::get('/getGrades/{lrn}/{syr}', [AuthController::class, 'getGrades']);
-Route::post('/permit', [AuthController::class, 'permit']);
-Route::post('/decline', [AuthController::class, 'decline']);
+        //Rostering Routes
 
-//Message Routes
+        // Route::get('/getClassInfo/{cid}', [AuthController::class, 'getClassInfo']);
+        Route::get('/getClassInfo', [AuthController::class, 'getClassInfo']);
+        // Route::get('/getRosterInfo/{cid}', [AuthController::class, 'getRosterInfo']);
+        Route::get('/getRosterInfo', [AuthController::class, 'getRosterInfo']);
+        Route::post('/addStudent', [AuthController::class, 'addStudent']);
+        // Route::delete('/removeStudent/{rid}', [AuthController::class, 'removeStudent']);
+        Route::delete('/removeStudent', [AuthController::class, 'removeStudent']);
+        Route::get('/getEnrolees/{lvl}', [AuthController::class, 'getEnrolees']);
 
-Route::get('/getMessages', [AuthController::class, 'getMessages']);
-Route::get('/message', [AuthController::class, 'message']);
-Route::get('/getConvo/{sid}', [AuthController::class, 'getConvo']);
-Route::get('/displaymsg', [AuthController::class, 'displaymsg']);
-Route::post('/sendMessage', [AuthController::class, 'sendMessage']);
-Route::get('/getStudentParents', [AuthController::class, 'getStudentParents']);
+        Route::get('/getClass', [AuthController::class, 'getClass']);
+
+        //Grades Routes
+
+        Route::get('/getClassGrades', [AuthController::class, 'getClassGrades']);
+        Route::get('/allenrollments', [AuthController::class, 'allenrollments']);
+        Route::get('/getSubjectRosters', [AuthController::class, 'getSubjectRosters']);
+        Route::get('/getGrades/{lrn}/{syr}', [AuthController::class, 'getGrades']);
+        Route::post('/permit', [AuthController::class, 'permit']);
+        Route::post('/decline', [AuthController::class, 'decline']);
+
+        //Message Routes
+
+        Route::get('/getMessages', [AuthController::class, 'getMessages']);
+        Route::get('/message', [AuthController::class, 'message']);
+        Route::get('/getConvo/{sid}', [AuthController::class, 'getConvo']);
+        Route::get('/displaymsg', [AuthController::class, 'displaymsg']);
+        Route::post('/sendMessage', [AuthController::class, 'sendMessage']);
+        Route::get('/getStudentParents', [AuthController::class, 'getStudentParents']);
+//     });
+// });
+
+
+
+
 
 // Enrollment/Students Routes
 

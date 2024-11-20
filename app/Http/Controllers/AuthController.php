@@ -47,9 +47,11 @@ class AuthController extends Controller
         }
 
         $token = $admin->createToken($admin->fname);
+        $role = $admin->role;
 
         return [
             'admin' => $admin,
+            'role' => $role,
             'token' => $token->plainTextToken
         ];
     }
@@ -107,7 +109,12 @@ class AuthController extends Controller
         ->groupBy('message_sender');
 
         $data = DB::table('messages')
-            ->leftJoin('students', 'messages.message_sender', '=', 'students.LRN')
+            ->leftJoin('students', function ($join) {
+                $join->on('messages.message_sender', '=', 'students.LRN');
+            })
+            ->leftJoin('parent_guardians', function ($join) {
+                $join->on('messages.message_sender', '=', 'parent_guardians.guardian_id');
+            })
             ->leftJoin('admins', 'messages.message_reciever', '=', 'admins.admin_id')
             ->joinSub($latestMessages, 'latest_messages', function ($join) {
                 $join->on('messages.message_sender', '=', 'latest_messages.message_sender')
@@ -119,7 +126,10 @@ class AuthController extends Controller
             // ->join('admins as sender_admin', 'messages.message_sender', '=', 'sender_admin.admin_id')
             // ->join('students as reciever', 'messages.message_reciever', '=', 'reciever.LRN')
             ->select('messages.*', 
-                    DB::raw('CONCAT(students.fname, " ",LEFT(students.mname, 1), ". ", students.lname)as student_name'),
+                    DB::raw('CASE 
+                    WHEN messages.message_sender IN (SELECT LRN FROM students) THEN CONCAT(students.fname, " ", LEFT(students.mname, 1), ". ", students.lname)
+                    WHEN messages.message_sender IN (SELECT guardian_id FROM parent_guardians) THEN CONCAT(parent_guardians.fname, " ", LEFT(parent_guardians.mname, 1), ". ", parent_guardians.lname)
+                    END as sender_name'),
                     DB::raw('CONCAT(admins.fname, " ",LEFT(admins.mname, 1), ". ", admins.lname)as admin_name'))
             ->get();
     
@@ -406,21 +416,20 @@ class AuthController extends Controller
     }
 
     public function removeStudent(Request $request) {
-        $classIds = $request->input('cid'); // Expecting an array of class IDs
-        $rid = $request->input('rid');
+        $lrn = $request->input('lrn'); // Expecting the LRN of the student to be removed
     
         // Log the received data
-        Log::info('Removing student with LRN: ' . $rid . ' from classes: ' . implode(',', $classIds));
+        Log::info('Removing student with LRN: ' . $lrn);
     
-        // Remove the student from the specified classes
-        $deletedRows = DB::table('rosters')->where('roster_id', $rid)->whereIn('class_id', $classIds)->delete();
+        // Remove the student from the roster based on LRN
+        $deletedRows = DB::table('rosters')->where('LRN', $lrn)->delete();
     
         // Log the number of deleted rows
         Log::info('Number of deleted rows: ' . $deletedRows);
     
         return response()->json([
             'success' => true,
-            'message' => 'Student removed from classes successfully',
+            'message' => 'Student removed from all classes successfully',
         ]);
     }
 
@@ -500,6 +509,7 @@ class AuthController extends Controller
                 'subjects.subject_id',
                 'subjects.subject_name',
                 'subjects.strand',
+                'subjects.grade_level',
                 'enrollments.school_year',
                 DB::raw(
                     "MAX(CASE WHEN grades.term = '1st Quarter' THEN grades.grade ELSE NULL END) AS grade_Q1,
@@ -513,10 +523,16 @@ class AuthController extends Controller
                      MAX(CASE WHEN grades.term = '3rd Quarter' THEN grades.grade_id ELSE NULL END) AS grade_id_Q3,
                      MAX(CASE WHEN grades.term = '4th Quarter' THEN grades.grade ELSE NULL END) AS grade_Q4,
                      MAX(CASE WHEN grades.term = '4th Quarter' THEN grades.permission ELSE NULL END) AS permission_Q4,
-                     MAX(CASE WHEN grades.term = '4th Quarter' THEN grades.grade_id ELSE NULL END) AS grade_id_Q4"
+                     MAX(CASE WHEN grades.term = '4th Quarter' THEN grades.grade_id ELSE NULL END) AS grade_id_Q4,
+                     MAX(CASE WHEN grades.term = 'Midterm' THEN grades.grade ELSE NULL END) AS midterm,
+                     MAX(CASE WHEN grades.term = 'Midterm' THEN grades.permission ELSE NULL END) AS permission_midterm,
+                     MAX(CASE WHEN grades.term = 'Midterm' THEN grades.grade_id ELSE NULL END) AS grade_id_midterm,
+                     MAX(CASE WHEN grades.term = 'Final' THEN grades.grade ELSE NULL END) AS final,
+                     MAX(CASE WHEN grades.term = 'Final' THEN grades.permission ELSE NULL END) AS permission_final,
+                     MAX(CASE WHEN grades.term = 'Final' THEN grades.grade_id ELSE NULL END) AS grade_id_final"
                 )
             )
-            ->groupBy('students.LRN', 'student_name', 'students.gender', 'students.contact_no', 'subjects.subject_id', 'subjects.subject_name', 'subjects.strand', 'enrollments.school_year',)
+            ->groupBy('students.LRN', 'student_name', 'students.gender', 'students.contact_no', 'subjects.subject_id', 'subjects.subject_name', 'subjects.strand', 'enrollments.school_year', 'subjects.grade_level',)
             ->orderByRaw("CASE WHEN students.gender = 'MALE' THEN 0 ELSE 1 END")
             ->orderBy('students.lname')
             ->get();
@@ -613,6 +629,64 @@ class AuthController extends Controller
     //     return $rosters;
     // }
 
+
+    // public function getGrades($lrn, $syr) {
+    //     // Fetch student information
+    //     $student = DB::table('students')
+    //         ->where('LRN', '=', $lrn)
+    //         ->first();
+
+    //     $enrollments = DB::table('enrollments')
+    //         ->where('LRN', '=', $lrn)
+    //         ->first();
+        
+    //     // Fetch grades and join with necessary tables
+    //     $grades = DB::table('grades')
+    //         ->join('students', 'grades.LRN', '=', 'students.LRN')
+    //         ->join('enrollments', 'students.LRN', '=', 'enrollments.LRN')
+    //         ->join('classes', 'grades.class_id', '=', 'classes.class_id')
+    //         ->join('sections', 'classes.section_id', '=', 'sections.section_id')
+    //         ->leftJoin('subjects', 'classes.subject_id', '=', 'subjects.subject_id')
+    //         ->where('grades.LRN', '=', $lrn)
+    //         ->where('enrollments.school_year', '=', $syr)
+    //         ->select('sections.*', 'subjects.subject_name', 'grades.grade', 'grades.term', 'enrollments.grade_level', 'classes.*')
+    //         ->get()
+    //         ->groupBy('subject_name');
+        
+    //     $result = [];
+    //     // Loop through each subject to organize grades
+       
+    //         foreach ($grades as $subject => $subjectGrades) {
+    //             $subjectResult = [
+    //                 '1st Quarter' => null,
+    //                 '2nd Quarter' => null,
+    //                 '3rd Quarter' => null,
+    //                 '4th Quarter' => null,
+    //                 'Midterm' => null,
+    //                 'Final' => null
+    //             ];
+    //             foreach ($subjectGrades as $grade) {
+    //                 $subjectResult[$grade->term] = $grade->grade;
+    //             }
+    //             $result[$subject] = $subjectResult;
+    //         }
+   
+            
+        
+    //     // Construct student info
+    //     $studentInfo = [
+    //         'full_name' => trim($student->fname . ' ' . $student->lname), // Combine first and last name
+    //         'grade_level' => $enrollments->grade_level,
+    //         'LRN' => $lrn, // Include the LRN
+    //         'school_year' => $syr // Include the school year
+    //     ];
+        
+    //     // Return both student info and grades
+    //     return [
+    //         ['student' => $studentInfo],
+    //         ['grades' => $result]
+    //     ];
+    // }
     
 
     public function getGrades($lrn, $syr) {
@@ -620,17 +694,22 @@ class AuthController extends Controller
         $student = DB::table('students')
             ->where('LRN', '=', $lrn)
             ->first();
+    
+        $enrollments = DB::table('enrollments')
+            ->where('LRN', '=', $lrn)
+            ->first();
         
-        // Fetch grades and join with necessary tables
-        $grades = DB::table('grades')
-            ->join('students', 'grades.LRN', '=', 'students.LRN')
-            ->join('enrollments', 'students.LRN', '=', 'enrollments.LRN')
-            ->join('classes', 'grades.class_id', '=', 'classes.class_id')
-            ->join('sections', 'classes.section_id', '=', 'sections.section_id')
-            ->leftJoin('subjects', 'classes.subject_id', '=', 'subjects.subject_id')
-            ->where('grades.LRN', '=', $lrn)
-            ->where('enrollments.school_year', '=', $syr)
-            ->select('sections.*', 'subjects.subject_name', 'grades.grade', 'grades.term')
+        // Fetch subjects with grades (if available) and join with necessary tables
+        $grades = DB::table('subjects')
+            ->leftJoin('classes', 'subjects.subject_id', '=', 'classes.subject_id')
+            ->leftJoin('rosters', 'classes.class_id', '=', 'rosters.roster_id')
+            ->leftJoin('grades', function ($join) use ($lrn) {
+                $join->on('grades.class_id', '=', 'classes.class_id')
+                     ->where('grades.LRN', '=', $lrn);
+            })
+            ->leftJoin('sections', 'classes.section_id', '=', 'sections.section_id')
+            ->where('sections.grade_level', '=', $enrollments->grade_level)
+            ->select('sections.*', 'subjects.subject_name', 'grades.grade', 'grades.term', 'classes.*')
             ->get()
             ->groupBy('subject_name');
         
@@ -641,17 +720,21 @@ class AuthController extends Controller
                 '1st Quarter' => null,
                 '2nd Quarter' => null,
                 '3rd Quarter' => null,
-                '4th Quarter' => null
+                '4th Quarter' => null,
+                'Midterm' => null,
+                'Final' => null
             ];
             foreach ($subjectGrades as $grade) {
                 $subjectResult[$grade->term] = $grade->grade;
             }
             $result[$subject] = $subjectResult;
         }
-        
+    
         // Construct student info
         $studentInfo = [
             'full_name' => trim($student->fname . ' ' . $student->lname), // Combine first and last name
+            'strand' => $enrollments->strand,
+            'grade_level' => $enrollments->grade_level,
             'LRN' => $lrn, // Include the LRN
             'school_year' => $syr // Include the school year
         ];
@@ -924,6 +1007,11 @@ class AuthController extends Controller
     
         return response()->json(['message' => 'User details updated successfully']);
     }
+
+
+
+
+
 
 
     // Registration Student

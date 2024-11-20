@@ -21,8 +21,8 @@ return new class extends Migration
             $table->string('last_attended');
             $table->string('public_private');
             $table->date('date_register')->nullable();
-            $table->string('strand');
-            $table->string('school_year');
+            $table->string('strand')->nullable();
+            $table->string('school_year')->nullable();
             $table->timestamps();
         });
     }
