@@ -1021,7 +1021,7 @@ class AuthController extends Controller
         $formField = $request->validate([
             'LRN' => 'required|integer|unique:students,LRN', 
             'fname' => 'required|string|max:255', 
-            'mname' => 'required|string|max:255', 
+            'mname' => 'nullable|string|max:255', 
             'lname' => 'required|string|max:255', 
             'bdate' => 'required|date|max:255', 
             'email' => 'required|email|max:255|unique:students,email',
@@ -1029,6 +1029,52 @@ class AuthController extends Controller
         ]);
         Student::create($formField);
         return $request;
+    } 
+
+    public function personalDetails(Request $request){
+        $formField = $request->validate([
+            'LRN' => 'required|integer', 
+            'fname' => 'required|string|max:255', 
+            'mname' => 'string|max:255', 
+            'lname' => 'required|string|max:255', 
+            'suffix' => 'nullable|string|max:255', 
+            'bdate' => 'required|date',
+            'bplace' => 'required|string|max:255',
+            'address' => 'required|string|max:255',
+            'gender' => 'required|string|max:255',
+            'contact_no' => 'required|string|max:255',
+            'religion' => 'required|string|max:255',
+        ]);
+
+        $pdata = DB::table('students')
+            ->where('LRN', '=', $formField['LRN'])
+            ->update([
+                'suffix' => $formField['suffix'],
+                'bplace' => $formField['bplace'],
+                'address' => $formField['address'],
+                'gender' => $formField['gender'],
+                'contact_no' => $formField['contact_no'],
+                'gender' => $formField['gender'],
+                'religion' => $formField['religion']
+            ]);
+       
+        return $pdata;
+    }
+
+    public function enrollmentDetails(Request $request){
+        $formField = $request->validate([
+            'LRN' => 'required|integer', 
+            'grade_level' => 'required|string|max:255',
+            'strand' => 'nullable|string|max:255', 
+            'school_year' => 'required|string|max:255', 
+            'last_attended' => 'required|string|max:255',
+            'public_private' => 'required|string|max:255',
+            'guardian_name' => 'required|string|max:255',    
+        ]);
+
+        $edata = Enrollment::create($formField);
+
+        return $edata;
     }
 
     public function enrollmentLogin(Request $request) {
@@ -1050,19 +1096,6 @@ class AuthController extends Controller
             'student' => $student,
             'token' => $token->plainTextToken
         ];
-    }
-
-    public function enrollmentDetails(Request $request){
-        $formField = $request->validate([
-            'LRN' => 'required|integer|unique:students,LRN', 
-            'strand' => 'required|string|max:255', 
-            'school_year' => 'required|string|max:255', 
-            'last_attended' => 'required|string|max:255',
-            'public_private' => 'required|string|max:255',  
-        ]);
-
-        Enrollment::create($formField);
-        return $request;
     }
 
 

@@ -22,7 +22,7 @@ return new class extends Migration
             $table->string('public_private');
             $table->date('date_register')->nullable();
             $table->string('strand')->nullable();
-            $table->string('school_year')->nullable();
+            $table->string('school_year');
             $table->timestamps();
         });
     }

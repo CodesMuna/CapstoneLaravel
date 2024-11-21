@@ -19,6 +19,7 @@ return new class extends Migration
             $table->string('room');
             $table->string('schedule');
             $table->string('time');
+            $table->integer('semester')->nullable();
             $table->timestamps();
         });
     }

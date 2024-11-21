@@ -15,7 +15,7 @@ return new class extends Migration
             $table->id('LRN')->primary();
             $table->string('fname');
             $table->string('lname');
-            $table->string('mname');
+            $table->string('mname')->nullable();
             $table->string('suffix')->nullable();
             $table->date('bdate');
             $table->string('bplace')->nullable();

@@ -99,4 +99,6 @@ Route::post('/login', [AuthController::class, 'login']);
 
 Route::post('/signup', [AuthController::class, 'signup']);
 Route::post('/enrollmentLogin', [AuthController::class, 'enrollmentLogin']);
+
+Route::post('/personalDetails', [AuthController::class, 'personalDetails']);
 Route::post('/enrollmentDetails', [AuthController::class, 'enrollmentDetails']);
