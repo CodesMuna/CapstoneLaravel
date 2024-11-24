@@ -17,7 +17,7 @@ return new class extends Migration
             $table->unsignedBigInteger('class_id'); // Class ID
             $table->string('grade'); // Grade (e.g., A, B, C or numeric value)
             $table->string('term');
-            $table->string('semester')->nullable();
+            // $table->string('semester')->nullable();
             $table->string('permission')->nullable(); // Term (e.g., First Semester, Second Semester)
             $table->timestamps(); // Created at and updated at timestamps
         });
