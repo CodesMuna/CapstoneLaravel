@@ -17,7 +17,6 @@ return new class extends Migration
             $table->foreignId('class_id');
             $table->string('title');
             $table->string('announcement');
-            $table->date('date_announced');
             $table->timestamps();
         });
     }

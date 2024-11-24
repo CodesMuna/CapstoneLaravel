@@ -29,8 +29,8 @@ Route::post('/login', [AuthController::class, 'login']);
 // Route::apiResource('students', StudentController::class);
 
 
-// Route::middleware(['auth:sanctum'])->group(function () {
-//     Route::middleware(['Registrar'])->group(function () {
+Route::middleware(['auth:sanctum'])->group(function () {
+    Route::middleware(['Registrar'])->group(function () {
 
         Route::post('/logout', [AuthController::class, 'logout'])->middleware('auth:sanctum');
 
@@ -88,8 +88,21 @@ Route::post('/login', [AuthController::class, 'login']);
         Route::get('/displaymsg', [AuthController::class, 'displaymsg']);
         Route::post('/sendMessage', [AuthController::class, 'sendMessage']);
         Route::get('/getStudentParents', [AuthController::class, 'getStudentParents']);
-//     });
-// });
+
+        // Account 
+        Route::put('/update-password', [AuthController::class, 'updatePass']);
+        Route::post('/upload-image', [AuthController::class, 'uploadImage']);
+        Route::get('assets/adminPic/{filename}', function ($filename) {
+            $path = public_path('assets/adminPic/' . $filename);
+            
+            if (file_exists($path)) {
+                return response()->file($path);
+            }
+        
+            abort(404);
+        });
+    });
+});
 
 
 
@@ -99,6 +112,7 @@ Route::post('/login', [AuthController::class, 'login']);
 
 Route::post('/signup', [AuthController::class, 'signup']);
 Route::post('/enrollmentLogin', [AuthController::class, 'enrollmentLogin']);
+Route::get('/getStudentEnrollment', [AuthController::class, 'getStudentEnrollment']);
 
 Route::post('/personalDetails', [AuthController::class, 'personalDetails']);
 Route::post('/enrollmentDetails', [AuthController::class, 'enrollmentDetails']);

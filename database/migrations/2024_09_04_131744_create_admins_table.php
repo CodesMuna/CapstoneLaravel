@@ -16,10 +16,10 @@ return new class extends Migration
             $table->id('admin_id')->primary();
             $table->string('fname');
             $table->string('lname');
-            $table->string('mname');
+            $table->string('mname')->nullable();
             $table->string('role');
             $table->string('address');
-            $table->string('admin_pic')->nullable();;
+            $table->string('admin_pic')->nullable();
             $table->string('email')->unique();
             $table->string('password');
             $table->timestamps();

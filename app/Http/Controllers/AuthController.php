@@ -22,10 +22,10 @@ class AuthController extends Controller
         $formField = $request->validate([
             'fname' => 'required|max: 255',
             'lname' => 'required|max: 255',
-            'mname' => 'required|max: 255',
+            'mname' => 'nullable|max: 255',
             'role' => 'required|max: 255',
             'address' => 'required|max: 255',
-            'email' => 'required|email|unique:admins',
+            'email' => 'required|email',
             'password' => 'required|confirmed'
         ]);
 
@@ -56,32 +56,6 @@ class AuthController extends Controller
         ];
     }
 
-  
-    // public function studentLogin(Request $request){
-    //     $request->validate([
-    //         'email' => 'required|email|exists:students',
-    //         'password' => 'required'
-    //     ]);
-
-    //     $student = DB::table('enrollments')
-    //         ->leftJoin('students', 'enrollments.LRN', '=', 'students.LRN')
-    //         ->where('enrollments.regapproval_date', '=', '0000-00-00')
-    //         ->select('students.*', 'enrollments.*')
-    //         ->first();
-    //         if(!$student || !Hash::check($request->password,$student->password)){
-    //             return [
-    //                 'message' => 'The provided credentials are incorrect'
-    //             ];
-    //         }
-        
-    //     $token = $student->createToken($student->fname);
-
-    //     return [
-    //         'student' => $student,
-    //         'token' => $token->plainTextToken
-    //     ];
-    // }
-
     public function logout(Request $request){
         $request->user()->tokens()->delete();
         return [
@@ -103,7 +77,9 @@ class AuthController extends Controller
         return $latestMessages;
     }
 
-    public function getInquiries(){
+    public function getInquiries(Request $request){
+        $uid = $request->input('uid');
+
         $latestMessages = DB::table('messages')
         ->select('message_sender', DB::raw('MAX(created_at) as max_created_at'))
         ->groupBy('message_sender');
@@ -123,6 +99,7 @@ class AuthController extends Controller
             ->whereNotIn('messages.message_sender', function ($query) {
                 $query->select('admin_id')->from('admins');
             })
+            ->where('messages.message_reciever', '=', $uid)
             // ->join('admins as sender_admin', 'messages.message_sender', '=', 'sender_admin.admin_id')
             // ->join('students as reciever', 'messages.message_reciever', '=', 'reciever.LRN')
             ->select('messages.*', 
@@ -146,7 +123,7 @@ class AuthController extends Controller
         $enrollments = DB::table('enrollments')
                         ->leftJoin('students', 'enrollments.LRN', '=', 'students.LRN')
                         ->where('enrollments.school_year', '=', $schoolYear)
-                        ->where('enrollments.date_register', '!=', null)
+                        // ->where('enrollments.date_register', '!=', null)
                         ->select('enrollments.*', 'students.*', DB::raw('CONCAT(students.fname, " ",LEFT(students.mname, 1), ". ", students.lname)as full_name'))
                         ->get();
                         
@@ -197,30 +174,28 @@ class AuthController extends Controller
 
     //Section Functions
 
-    public function getSections(){
-        $klases = DB::table('sections')
-            ->select('sections.*')
-            ->get();
-
-        return $klases;
+    public function getSections(Request $request) {
+        $gradeLevel = $request->query('gradeLevel'); // Get the grade level from the query parameters
+        $strand = $request->query('strand'); // Get the strand from the query parameters
+    
+        $query = DB::table('sections')->select('sections.*');
+    
+        if ($gradeLevel) {
+            $query->where('grade_level', $gradeLevel);
+        }
+    
+        if ($strand) {
+            $query->where('strand', $strand); // Assuming 'strand' is a column in your sections table
+        }
+    
+        $sections = $query->get();
+    
+        return response()->json($sections);
     }
 
+    
 
     //Roster Functions
-
-    // public function createRoster($cid) {
-    //     try {
-    //         $data = DB::table('rosters')
-    //           ->insertGetId([
-    //             'class_id' => $cid,
-    //             'LRN' => null,
-    //           ]);
-          
-    //         return $data;
-    //     } catch (\Exception $e) {
-    //         return response()->json(['error' => $e->getMessage()], 500);
-    //     }
-    // }
 
     public function createRoster(Request $request) {
         try {
@@ -303,40 +278,7 @@ class AuthController extends Controller
         return response()->json($data);
     }
 
-
-    // public function getRosterInfo($cid){
-    //     $data = DB::table('rosters')
-    //         ->join('students', 'rosters.LRN', '=', 'students.LRN')
-    //         ->join('classes', 'rosters.class_id', '=', 'classes.class_id')
-    //         ->join('sections', 'classes.section_id', '=', 'sections.section_id')
-    //         ->leftJoin('subjects', 'classes.subject_id', '=', 'subjects.subject_id')
-    //         // ->where('students.LRN', '=' ,  $lrn)
-    //         ->where('rosters.class_id', '=' ,  $cid)
-    //         // ->select('students.*', 'enrollments.*')
-    //         ->select('rosters.*', 'students.*', 'classes.*', 'subjects.*', 'sections.*',DB::raw('CONCAT(students.fname, " ",LEFT(students.mname, 1), ". ", students.lname)as student_name'))
-    //         ->get();
-
-    // // return response()->json($data);
-    //     return $data;
-    // }
-
-    
-
     //Rostering Functions
-
-    // public function getClassInfo($cid){
-    //     $data = DB::table('classes')
-    //         ->join('sections', 'classes.section_id', '=', 'sections.section_id')
-    //         ->leftJoin('subjects', 'classes.subject_id', '=', 'subjects.subject_id')
-    //         // ->where('students.LRN', '=' ,  $lrn)
-    //         ->where('classes.class_id', '=' ,  $cid)
-    //         // ->select('students.*', 'enrollments.*')
-    //         ->select('classes.*', 'sections.*')
-    //         ->get();
-
-    // // return response()->json($data);
-    //     return $data;
-    // }
 
     public function getClassInfo(Request $request) {
         // Validate the input
@@ -381,18 +323,6 @@ class AuthController extends Controller
         return response()->json($data);
     }
 
-    // public function addStudent(Request $request) {
-    //     $cid = $request->input('cid');
-    //     $lrn = $request->input('lrn');
-    //     $data = DB::table('rosters')
-    //       ->insertGetId([
-    //         'class_id' => $cid,
-    //         'LRN' => $lrn
-    //       ]);
-      
-    //     return $data;
-    //   }
-
     public function addStudent(Request $request) {
         $classIds = $request->input('cid'); // Expecting an array of class IDs
         $lrn = $request->input('lrn');
@@ -432,14 +362,6 @@ class AuthController extends Controller
             'message' => 'Student removed from all classes successfully',
         ]);
     }
-
-    // public function removeStudent($rid){
-    //     $data = DB::table('rosters')
-    //         ->where('roster_id', $rid)
-    //         ->delete();
-
-    //     return $data;
-    // }
 
     public function getClass(){
         $data = DB::table('classes')
@@ -597,98 +519,7 @@ class AuthController extends Controller
     
             return response()->json(['success' => 'Grade permission updated successfully']);
     }
-
-    // public function getSubjectRosters(Request $request){
-    //     $gradeLevel = $request->input('gradelevel');
-    //     $section = $request->input('section');
-    //     $strand = $request->input('strand');
-    //     $subject = $request->input('subject');
-    //     $gender = $request->input('gender');
-        
-    //     $rosters = DB::table('rosters')
-    //         ->join('students', 'grades.LRN', '=', 'students.LRN')
-    //         ->join('grades', 'students.LRN', '=', 'grades.LRN')
-    //         ->join('classes', 'rosters.class_id', '=', 'classes.class_id')
-    //         ->join('admins', 'classes.admin_id', '=', 'admins.admin_id')
-    //         ->join('sections', 'classes.section_id', '=', 'sections.section_id')
-    //         ->leftJoin('subjects', 'classes.subject_id', '=', 'subjects.subject_id')
-    //         ->where('sections.grade_level', '=', $gradeLevel)
-    //         ->where('sections.section_name', '=', $section)
-    //         ->where('subjects.subject_name', '=', $subject)
-    //         ->when($strand, function ($query, $strand) {
-    //             if ($strand !== '') {
-    //                 return $query->where('subjects.strand', '=', $strand);
-    //             }
-    //         })
-    //         ->when($gender, function ($query, $gender) {
-    //             return $query->where('students.gender', '=', $gender);
-    //         })
-    //         ->select('grades.*','rosters.*', 'classes.*', 'admins.fname as admin_name', 'subjects.*', 'students.contact_no', 'students.gender',DB::raw('CONCAT(students.fname, " ",LEFT(students.mname, 1), ". ", students.lname)as student_name'))
-    //         ->get();
-        
-    //     return $rosters;
-    // }
-
-
-    // public function getGrades($lrn, $syr) {
-    //     // Fetch student information
-    //     $student = DB::table('students')
-    //         ->where('LRN', '=', $lrn)
-    //         ->first();
-
-    //     $enrollments = DB::table('enrollments')
-    //         ->where('LRN', '=', $lrn)
-    //         ->first();
-        
-    //     // Fetch grades and join with necessary tables
-    //     $grades = DB::table('grades')
-    //         ->join('students', 'grades.LRN', '=', 'students.LRN')
-    //         ->join('enrollments', 'students.LRN', '=', 'enrollments.LRN')
-    //         ->join('classes', 'grades.class_id', '=', 'classes.class_id')
-    //         ->join('sections', 'classes.section_id', '=', 'sections.section_id')
-    //         ->leftJoin('subjects', 'classes.subject_id', '=', 'subjects.subject_id')
-    //         ->where('grades.LRN', '=', $lrn)
-    //         ->where('enrollments.school_year', '=', $syr)
-    //         ->select('sections.*', 'subjects.subject_name', 'grades.grade', 'grades.term', 'enrollments.grade_level', 'classes.*')
-    //         ->get()
-    //         ->groupBy('subject_name');
-        
-    //     $result = [];
-    //     // Loop through each subject to organize grades
-       
-    //         foreach ($grades as $subject => $subjectGrades) {
-    //             $subjectResult = [
-    //                 '1st Quarter' => null,
-    //                 '2nd Quarter' => null,
-    //                 '3rd Quarter' => null,
-    //                 '4th Quarter' => null,
-    //                 'Midterm' => null,
-    //                 'Final' => null
-    //             ];
-    //             foreach ($subjectGrades as $grade) {
-    //                 $subjectResult[$grade->term] = $grade->grade;
-    //             }
-    //             $result[$subject] = $subjectResult;
-    //         }
-   
-            
-        
-    //     // Construct student info
-    //     $studentInfo = [
-    //         'full_name' => trim($student->fname . ' ' . $student->lname), // Combine first and last name
-    //         'grade_level' => $enrollments->grade_level,
-    //         'LRN' => $lrn, // Include the LRN
-    //         'school_year' => $syr // Include the school year
-    //     ];
-        
-    //     // Return both student info and grades
-    //     return [
-    //         ['student' => $studentInfo],
-    //         ['grades' => $result]
-    //     ];
-    // }
     
-
     public function getGrades($lrn, $syr) {
         // Fetch student information
         $student = DB::table('students')
@@ -746,29 +577,19 @@ class AuthController extends Controller
         ];
     }
 
-    // public function getGrades($lrn, $syr){
-    //     $grades = DB::table('grades')
-    //             ->join('students', 'grades.LRN', '=', 'students.LRN')
-    //             ->join('enrollments', 'students.LRN', '=', 'enrollments.LRN')
-    //             ->join('classes', 'grades.class_id', '=', 'classes.class_id')
-    //             ->join('sections', 'classes.section_id', '=', 'sections.section_id')
-    //             ->leftJoin('subjects', 'classes.subject_id', '=', 'subjects.subject_id')
-    //             ->where('grades.LRN', '=', $lrn)
-    //             ->where('enrollments.school_year', '=', $syr)
-    //             ->select('sections.*', 'subjects.subject_name', 'grades.grade', 'grades.term')
-    //             ->get();
-                
-                
-    //         return $grades;
-    // }
-
 
     // Message Functions
 
     public function getStudentParents() {
         // Fetch students
         $students = DB::table('students')
-            ->select('students.LRN', DB::raw('CONCAT(students.fname, " ", LEFT(students.mname, 1), ". ", students.lname) as account_name'))
+            ->select('students.LRN', 
+                DB::raw('CONCAT(students.fname, 
+                    CASE 
+                        WHEN students.mname IS NOT NULL THEN CONCAT(" ", LEFT(students.mname, 1), ".") 
+                        ELSE "" 
+                    END, 
+                    " ", students.lname) as account_name'))
             ->get()
             ->map(function ($student) {
                 return [
@@ -777,10 +598,16 @@ class AuthController extends Controller
                     'type' => 'student',
                 ];
             });
-
+    
         // Fetch parents
         $parents = DB::table('parent_guardians')
-            ->select('parent_guardians.guardian_id', DB::raw('CONCAT(parent_guardians.fname, " ", LEFT(parent_guardians.mname, 1), ". ", parent_guardians.lname) as account_name'))
+            ->select('parent_guardians.guardian_id', 
+                DB::raw('CONCAT(parent_guardians.fname, 
+                    CASE 
+                        WHEN parent_guardians.mname IS NOT NULL THEN CONCAT(" ", LEFT(parent_guardians.mname, 1), ".") 
+                        ELSE "" 
+                    END, 
+                    " ", parent_guardians.lname) as account_name'))
             ->get()
             ->map(function ($parent) {
                 return [
@@ -789,10 +616,10 @@ class AuthController extends Controller
                     'type' => 'parent',
                 ];
             });
-
+    
         // Combine both collections into one
         $accounts = $students->merge($parents);
-
+    
         return response()->json($accounts);
     }
 
@@ -876,34 +703,64 @@ class AuthController extends Controller
         if ($user) {
             $uid = $request->input('uid');
     
-            $convo = DB::table('messages')
-                ->leftJoin('students', function ($join) {
-                    $join->on('messages.message_sender', '=', 'students.LRN');
-                })
-                ->leftJoin('admins', function ($join) {
-                    $join->on('messages.message_sender', '=', 'admins.admin_id');
-                })
-                ->leftJoin('parent_guardians', function ($join) {
-                    $join->on('messages.message_sender', '=', 'parent_guardians.guardian_id');
-                })
-                ->where(function ($query) use ($uid) {
-                    $query->where('messages.message_sender', $uid) // Sent messages
-                          ->orWhere('messages.message_reciever', $uid); // Received replies
-                })     
-                ->where(function ($query) use ($sid) {
-                    $query->where('messages.message_sender', $sid) // Sent messages
-                          ->orWhere('messages.message_reciever', $sid); // Received replies
-                })        
-                ->select('messages.*', 
-                    DB::raw('CASE 
-                        WHEN messages.message_sender IN (SELECT LRN FROM students) THEN CONCAT(students.fname, " ", LEFT(students.mname, 1), ". ", students.lname)
-                        WHEN messages.message_sender IN (SELECT guardian_id FROM parent_guardians) THEN CONCAT(parent_guardians.fname, " ", LEFT(parent_guardians.mname, 1), ". ", parent_guardians.lname)
-                    END as sender_name'),
-                    DB::raw('CASE 
-                        WHEN messages.message_sender IN (SELECT admin_id FROM admins) THEN CONCAT(admins.fname, " ", LEFT(admins.mname, 1), ". ", admins.lname)
-                    END as me'))
-                ->get();
-        }
+        //     $convo = DB::table('messages')
+        //         ->leftJoin('students', function ($join) {
+        //             $join->on('messages.message_sender', '=', 'students.LRN');
+        //         })
+        //         ->leftJoin('admins', function ($join) {
+        //             $join->on('messages.message_sender', '=', 'admins.admin_id');
+        //         })
+        //         ->leftJoin('parent_guardians', function ($join) {
+        //             $join->on('messages.message_sender', '=', 'parent_guardians.guardian_id');
+        //         })
+        //         ->where(function ($query) use ($uid) {
+        //             $query->where('messages.message_sender', $uid) // Sent messages
+        //                   ->orWhere('messages.message_reciever', $uid); // Received replies
+        //         })     
+        //         ->where(function ($query) use ($sid) {
+        //             $query->where('messages.message_sender', $sid) // Sent messages
+        //                   ->orWhere('messages.message_reciever', $sid); // Received replies
+        //         })        
+        //         ->select('messages.*', 
+        //             DB::raw('CASE 
+        //                 WHEN messages.message_sender IN (SELECT LRN FROM students) THEN CONCAT(students.fname, " ", LEFT(students.mname, 1), ". ", students.lname)
+        //                 WHEN messages.message_sender IN (SELECT guardian_id FROM parent_guardians) THEN CONCAT(parent_guardians.fname, " ", LEFT(parent_guardians.mname, 1), ". ", parent_guardians.lname)
+        //             END as sender_name'),
+        //             DB::raw('CASE 
+        //                 WHEN messages.message_sender IN (SELECT guardian_id FROM parent_guardians) THEN CONCAT(parent_guardians.fname, " ", LEFT(parent_guardians.mname, 1), ". ", parent_guardians.lname)
+        //                 END as admin_name'),
+        //             DB::raw('CASE 
+        //                 WHEN messages.message_sender IN (SELECT admin_id FROM admins) THEN CONCAT(admins.fname, " ", LEFT(admins.mname, 1), ". ", admins.lname)
+        //                 END as admin_name'))
+        //         ->get();
+        // }
+
+        $convo = DB::table('messages')
+        ->leftJoin('students', 'messages.message_sender', '=', 'students.LRN')
+        ->leftJoin('admins', 'messages.message_sender', '=', 'admins.admin_id')
+        ->leftJoin('parent_guardians', 'messages.message_sender', '=', 'parent_guardians.guardian_id')
+        ->where(function ($query) use ($uid) {
+            $query->where('messages.message_sender', $uid)
+                ->orWhere('messages.message_reciever', $uid);
+        })
+        ->where(function ($query) use ($sid) {
+            $query->where('messages.message_sender', $sid)
+                ->orWhere('messages.message_reciever', $sid);
+        })
+        ->selectRaw("
+            messages.*,
+            CASE 
+                WHEN messages.message_sender = ? THEN 'me' 
+                ELSE NULL 
+            END as me,
+            CASE 
+                WHEN messages.message_sender IN (SELECT LRN FROM students) THEN CONCAT(students.fname, ' ', LEFT(students.mname, 1), '. ', students.lname)
+                WHEN messages.message_sender IN (SELECT guardian_id FROM parent_guardians) THEN CONCAT(parent_guardians.fname, ' ', LEFT(parent_guardians.mname, 1), '. ', parent_guardians.lname)
+                ELSE NULL 
+            END as sender_name
+        ", [$uid])
+        ->get();
+    }
     
         // Return the user information and conversation or a not found message
         return response()->json([
@@ -911,40 +768,6 @@ class AuthController extends Controller
             'conversation' => $convo,
         ]);
     }
-
-    // public function getConvo(Request $request, $sid){
-    //     $uid = $request->input('uid');
-
-    //     $convo = DB::table('messages')
-    //         ->leftJoin('students', function ($join) {
-    //             $join->on('messages.message_sender', '=', 'students.LRN');
-    //         })
-    //         ->leftJoin('admins', function ($join) {
-    //             $join->on('messages.message_sender', '=', 'admins.admin_id');
-    //         })
-    //         ->leftJoin('parent_guardians', function ($join) {
-    //             $join->on('messages.message_sender', '=', 'parent_guardians.guardian_id');
-    //         })
-    //         ->where(function ($query) use ($uid) {
-    //             $query->where('messages.message_sender', $uid) // Sent messages
-    //                   ->orWhere('messages.message_reciever', $uid); // Received replies
-    //         })     
-    //         ->where(function ($query) use ($sid) {
-    //             $query->where('messages.message_sender', $sid) // Sent messages
-    //                   ->orWhere('messages.message_reciever', $sid); // Received replies
-    //         })        
-    //         ->select('messages.*', 
-    //             DB::raw('CASE 
-    //                 WHEN messages.message_sender IN (SELECT LRN FROM students) THEN CONCAT(students.fname, " ",LEFT(students.mname, 1), ". ", students.lname)
-    //                 WHEN messages.message_sender IN (SELECT guardian_id FROM parent_guardians) THEN CONCAT(parent_guardians.fname, " ",LEFT(parent_guardians.mname, 1), ". ", parent_guardians.lname)
-    //             END as sender_name'),
-    //             DB::raw('CASE 
-    //                 WHEN messages.message_sender IN (SELECT admin_id FROM admins) THEN CONCAT(admins.fname, " ",LEFT(admins.mname, 1), ". ", admins.lname)
-    //             END as me'))
-    //         ->get();
-
-    //     return $convo;
-    // }
 
     public function sendMessage(Request $request){
         $validator = Validator::make($request->all(), [
@@ -970,8 +793,7 @@ class AuthController extends Controller
 
     // Account
 
-    public function updatePass(Request $request)
-    {
+    public function updatePass(Request $request) {
         // Validate incoming request
         $request->validate([
             'admin_id' => 'required|integer|exists:admins,admin_id',
@@ -986,17 +808,23 @@ class AuthController extends Controller
     
         // Retrieve user
         $user = Admin::find($request->admin_id);
+        
+        // Log the attempt to update user details
+        Log::info('Attempting to update user details for admin_id: ' . $request->admin_id);
     
         // If old password is provided, check it
         if ($request->oldPassword && !Hash::check($request->oldPassword, $user->password)) {
+            Log::warning('Wrong password attempt for admin_id: ' . $request->admin_id);
             return response()->json(['message' => 'Wrong password'], 401);
         }
     
         // Update user details
         if ($request->newPassword) {
             $user->password = Hash::make($request->newPassword); // Update password if provided
+            Log::info('Password updated for admin_id: ' . $request->admin_id);
         }
-        
+    
+        // Update other user details
         $user->fname = $request->fname;
         $user->mname = $request->mname;
         $user->lname = $request->lname;
@@ -1005,14 +833,47 @@ class AuthController extends Controller
     
         $user->save(); // Save all changes
     
-        return response()->json(['message' => 'User details updated successfully']);
+        // Log successful update
+        Log::info('User  details updated successfully for admin_id: ' . $request->admin_id);
+    
+        return response()->json(['message' => 'User  details updated successfully']);
     }
 
 
-
-
-
-
+    public function uploadImage(Request $request) {
+        $request->validate([
+            'image' => 'required|image|mimes:jpeg,png,jpg,gif|max:2048',
+            'admin_id' => 'required|exists:admins,admin_id'
+        ]);
+    
+        try {
+            $admin = Admin::findOrFail($request->input('admin_id'));
+            $image = $request->file('image');
+            $imageName = time() . '.' . $image->getClientOriginalExtension();
+            $destinationPath = public_path('assets/adminPic');
+    
+            // Ensure the directory exists
+            if (!is_dir($destinationPath)) {
+                mkdir($destinationPath, 0755, true);
+            }
+    
+            // Delete the old image if exists
+            if ($admin->admin_pic && file_exists($path = $destinationPath . '/' . $admin->admin_pic)) {
+                unlink($path);
+            }
+    
+            // Move the new image and update the admin profile
+            $image->move($destinationPath, $imageName);
+            $admin->update(['admin_pic' => $imageName]);
+    
+            return response()->json([
+                'message' => 'Image uploaded successfully.',
+                'image_url' => url('assets/adminPic/' . $imageName)
+            ]);
+        } catch (\Exception $e) {
+            return response()->json(['error' => 'Image upload failed.'], 500);
+        }
+    }
 
     // Registration Student
 
@@ -1099,8 +960,16 @@ class AuthController extends Controller
     }
 
 
-    public function EnrllmentProgress(Request $request){
-        
+    public function getStudentEnrollment(Request $request){
+        $sid = $request->input('sid');
+
+        $student = DB::table('students')
+            ->leftJoin('enrollments', 'students.LRN', '=', 'enrollments.LRN')
+            ->where('students.LRN', '=', $sid)
+            ->select('enrollments.*')
+            ->first();
+
+        return($student);
     }
 
    

@@ -16,11 +16,11 @@ return new class extends Migration
             $table->foreignId('LRN');
             $table->string('fname');
             $table->string('lname');
-            $table->string('mname');
+            $table->string('mname')->nullable();
             $table->string('address');
             $table->string('relationship');
             $table->string('contact_no');
-            $table->string('parent_pic')->nullable();;
+            $table->string('parent_pic')->nullable();
             $table->string('email')->unique();
             $table->string('password');
             $table->timestamps();
