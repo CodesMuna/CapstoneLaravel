@@ -16,7 +16,7 @@ return new class extends Migration
             $table->foreignId('LRN');
             $table->string('OR_number');
             $table->string('amount_paid');
-            $table->string('proof_payment');
+            $table->string('proof_payment')->nullable();
             $table->string('description');
             $table->date('date_of_payment');
             $table->timestamps();

@@ -15,7 +15,8 @@ return new class extends Migration
             $table->id('subject_id')->primary();
             $table->string('subject_name');
             $table->string('grade_level');
-            $table->string('strand');
+            $table->string('strand')->nullable();
+            $table->string('image')->nullable();
             $table->timestamps();
         });
     }

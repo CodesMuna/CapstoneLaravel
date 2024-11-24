@@ -15,10 +15,10 @@ return new class extends Migration
             $table->id('class_id')->primary();
             $table->foreignId('admin_id');
             $table->foreignId('section_id');
-            $table->foreignId('subject_id');
+            $table->foreignId('subject_id')->nullable();
             $table->string('room');
-            $table->string('schedule');
-            $table->string('time');
+            $table->string('schedule')->nullable();
+            $table->string('time')->nullable();
             $table->integer('semester')->nullable();
             $table->timestamps();
         });

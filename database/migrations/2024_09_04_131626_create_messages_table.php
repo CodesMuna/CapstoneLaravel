@@ -16,7 +16,7 @@ return new class extends Migration
             $table->foreignId('message_reciever');
             $table->foreignId('message_sender');
             $table->string('message');
-            $table->date('message_date');
+            $table->date('message_date');        
             $table->timestamps();
         });
     }
