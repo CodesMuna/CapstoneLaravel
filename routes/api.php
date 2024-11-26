@@ -29,8 +29,8 @@ Route::post('/login', [AuthController::class, 'login']);
 // Route::apiResource('students', StudentController::class);
 
 
-Route::middleware(['auth:sanctum'])->group(function () {
-    Route::middleware(['Registrar'])->group(function () {
+// Route::middleware(['auth:sanctum'])->group(function () {
+//     Route::middleware(['Registrar'])->group(function () {
 
         Route::post('/logout', [AuthController::class, 'logout'])->middleware('auth:sanctum');
 
@@ -51,6 +51,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
         //Classes Routes
 
         Route::get('/getSections', [AuthController::class, 'getSections']);
+        Route::get('/getSubjects', [AuthController::class, 'getSubjects']);
 
         //Roster Routes
 
@@ -101,8 +102,8 @@ Route::middleware(['auth:sanctum'])->group(function () {
         
             abort(404);
         });
-    });
-});
+//     });
+// });
 
 
 

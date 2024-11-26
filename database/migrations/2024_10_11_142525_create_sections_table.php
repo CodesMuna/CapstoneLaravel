@@ -14,8 +14,8 @@ return new class extends Migration
         Schema::create('sections', function (Blueprint $table) {
             $table->id('section_id')->primary();
             $table->string('section_name');
-            $table->string('grade_level')->nullable();
-            $table->string('strand')->nullable();
+            $table->string('grade_level');
+            $table->string('strand');
             $table->timestamps();
         });
     }

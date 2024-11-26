@@ -104,10 +104,22 @@ class AuthController extends Controller
             // ->join('students as reciever', 'messages.message_reciever', '=', 'reciever.LRN')
             ->select('messages.*', 
                     DB::raw('CASE 
-                    WHEN messages.message_sender IN (SELECT LRN FROM students) THEN CONCAT(students.fname, " ", LEFT(students.mname, 1), ". ", students.lname)
-                    WHEN messages.message_sender IN (SELECT guardian_id FROM parent_guardians) THEN CONCAT(parent_guardians.fname, " ", LEFT(parent_guardians.mname, 1), ". ", parent_guardians.lname)
-                    END as sender_name'),
-                    DB::raw('CONCAT(admins.fname, " ",LEFT(admins.mname, 1), ". ", admins.lname)as admin_name'))
+                    WHEN messages.message_sender IN (SELECT LRN FROM students) THEN 
+                    CONCAT(students.fname, " ", 
+                        CASE 
+                            WHEN students.mname IS NOT NULL THEN CONCAT(LEFT(students.mname, 1), ". ") 
+                            ELSE "" 
+                        END, 
+                    students.lname)
+                WHEN messages.message_sender IN (SELECT guardian_id FROM parent_guardians) THEN 
+                    CONCAT(parent_guardians.fname, " ", 
+                        CASE 
+                            WHEN parent_guardians.mname IS NOT NULL THEN CONCAT(LEFT(parent_guardians.mname, 1), ". ") 
+                            ELSE "" 
+                        END, 
+                    parent_guardians.lname)
+            END as sender_name'),
+                    DB::raw('CONCAT(admins.fname, " ",COALESCE(LEFT(admins.mname, 1),""), ". ", admins.lname)as admin_name'))
             ->get();
     
         return $data;
@@ -193,6 +205,25 @@ class AuthController extends Controller
         return response()->json($sections);
     }
 
+    public function getSubjects(Request $request) {
+        $gradeLevel = $request->query('gradeLevel'); // Get the grade level from the query parameters
+        $strand = $request->query('strand'); // Get the strand from the query parameters
+
+        $query = DB::table('subjects')->select('subjects.*');
+    
+        if ($gradeLevel) {
+            $query->where('grade_level', $gradeLevel);
+        }
+    
+        if ($strand) {
+            $query->where('strand', $strand); // Assuming 'strand' is a column in your sections table
+        }
+
+        $subjects = $query->get();
+    
+        return response()->json($subjects);
+    }
+
     
 
     //Roster Functions
@@ -250,7 +281,7 @@ class AuthController extends Controller
             ->where('sections.grade_level', '=', $gradeLevel)
             ->where('sections.section_name', '=', $section)
             ->when($strand, function ($query, $strand) {
-                if ($strand !== '') {
+                if ($strand !== '-') {
                     return $query->where('subjects.strand', '=', $strand);
                 }
             })
@@ -501,7 +532,7 @@ class AuthController extends Controller
       
             DB::table('grades')
                 ->where('grade_id', $gid)
-                ->update(['permission' => 'Permitted']);
+                ->update(['permission' => 'on']);
     
             return response()->json(['success' => 'Grade permission updated successfully']);
     }
@@ -515,7 +546,7 @@ class AuthController extends Controller
       
             DB::table('grades')
                 ->where('grade_id', $gid)
-                ->update(['permission' => null]);
+                ->update(['permission' => 'none']);
     
             return response()->json(['success' => 'Grade permission updated successfully']);
     }
@@ -644,10 +675,10 @@ class AuthController extends Controller
             ->leftJoin('parent_guardians', function ($join) {
                 $join->on('messages.message_sender', '=', 'parent_guardians.guardian_id');
             })
-            ->joinSub($latestMessages, 'latest_messages', function ($join) {
-                $join->on('messages.message_sender', '=', 'latest_messages.message_sender')
-                    ->on('messages.created_at', '=', 'latest_messages.max_created_at');
-            })
+            // ->joinSub($latestMessages, 'latest_messages', function ($join) {
+            //     $join->on('messages.message_sender', '=', 'latest_messages.message_sender')
+            //         ->on('messages.created_at', '=', 'latest_messages.max_created_at');
+            // })
             ->where('messages.message_reciever', '=', $uid) // Filter by receiver
             ->select('messages.*', 
                 DB::raw('CASE 
@@ -760,7 +791,7 @@ class AuthController extends Controller
             END as sender_name
         ", [$uid])
         ->get();
-    }
+     }
     
         // Return the user information and conversation or a not found message
         return response()->json([
@@ -958,7 +989,6 @@ class AuthController extends Controller
             'token' => $token->plainTextToken
         ];
     }
-
 
     public function getStudentEnrollment(Request $request){
         $sid = $request->input('sid');
