@@ -465,18 +465,18 @@ class AuthController extends Controller
                 'subjects.grade_level',
                 'enrollments.school_year',
                 DB::raw(
-                    "MAX(CASE WHEN grades.term = '1st Quarter' THEN grades.grade ELSE NULL END) AS grade_Q1,
-                     MAX(CASE WHEN grades.term = '1st Quarter' THEN grades.permission ELSE NULL END) AS permission_Q1,
-                     MAX(CASE WHEN grades.term = '1st Quarter' THEN grades.grade_id ELSE NULL END) AS grade_id_Q1,
-                     MAX(CASE WHEN grades.term = '2nd Quarter' THEN grades.grade ELSE NULL END) AS grade_Q2,
-                     MAX(CASE WHEN grades.term = '2nd Quarter' THEN grades.permission ELSE NULL END) AS permission_Q2,
-                     MAX(CASE WHEN grades.term = '2nd Quarter' THEN grades.grade_id ELSE NULL END) AS grade_id_Q2,
-                     MAX(CASE WHEN grades.term = '3rd Quarter' THEN grades.grade ELSE NULL END) AS grade_Q3,
-                     MAX(CASE WHEN grades.term = '3rd Quarter' THEN grades.permission ELSE NULL END) AS permission_Q3,
-                     MAX(CASE WHEN grades.term = '3rd Quarter' THEN grades.grade_id ELSE NULL END) AS grade_id_Q3,
-                     MAX(CASE WHEN grades.term = '4th Quarter' THEN grades.grade ELSE NULL END) AS grade_Q4,
-                     MAX(CASE WHEN grades.term = '4th Quarter' THEN grades.permission ELSE NULL END) AS permission_Q4,
-                     MAX(CASE WHEN grades.term = '4th Quarter' THEN grades.grade_id ELSE NULL END) AS grade_id_Q4,
+                    "MAX(CASE WHEN grades.term = 'First Quarter' THEN grades.grade ELSE NULL END) AS grade_Q1,
+                     MAX(CASE WHEN grades.term = 'First Quarter' THEN grades.permission ELSE NULL END) AS permission_Q1,
+                     MAX(CASE WHEN grades.term = 'First Quarter' THEN grades.grade_id ELSE NULL END) AS grade_id_Q1,
+                     MAX(CASE WHEN grades.term = 'Second Quarter' THEN grades.grade ELSE NULL END) AS grade_Q2,
+                     MAX(CASE WHEN grades.term = 'Second Quarter' THEN grades.permission ELSE NULL END) AS permission_Q2,
+                     MAX(CASE WHEN grades.term = 'Second Quarter' THEN grades.grade_id ELSE NULL END) AS grade_id_Q2,
+                     MAX(CASE WHEN grades.term = 'Third Quarter' THEN grades.grade ELSE NULL END) AS grade_Q3,
+                     MAX(CASE WHEN grades.term = 'Third Quarter' THEN grades.permission ELSE NULL END) AS permission_Q3,
+                     MAX(CASE WHEN grades.term = 'Third Quarter' THEN grades.grade_id ELSE NULL END) AS grade_id_Q3,
+                     MAX(CASE WHEN grades.term = 'Fourth Quarter' THEN grades.grade ELSE NULL END) AS grade_Q4,
+                     MAX(CASE WHEN grades.term = 'Fourth Quarter' THEN grades.permission ELSE NULL END) AS permission_Q4,
+                     MAX(CASE WHEN grades.term = 'Fourth Quarter' THEN grades.grade_id ELSE NULL END) AS grade_id_Q4,
                      MAX(CASE WHEN grades.term = 'Midterm' THEN grades.grade ELSE NULL END) AS midterm,
                      MAX(CASE WHEN grades.term = 'Midterm' THEN grades.permission ELSE NULL END) AS permission_midterm,
                      MAX(CASE WHEN grades.term = 'Midterm' THEN grades.grade_id ELSE NULL END) AS grade_id_midterm,
@@ -535,7 +535,7 @@ class AuthController extends Controller
                 ->update(['permission' => 'on']);
     
             return response()->json(['success' => 'Grade permission updated successfully']);
-    }
+    } 
 
     public function decline(Request $request){
         $gid = $request->input('gid'); // Get gid from request
@@ -579,10 +579,10 @@ class AuthController extends Controller
         // Loop through each subject to organize grades
         foreach ($grades as $subject => $subjectGrades) {
             $subjectResult = [
-                '1st Quarter' => null,
-                '2nd Quarter' => null,
-                '3rd Quarter' => null,
-                '4th Quarter' => null,
+                'First Quarter' => null,
+                'Second Quarter' => null,
+                'Third Quarter' => null,
+                'Fourth Quarter' => null,
                 'Midterm' => null,
                 'Final' => null
             ];
@@ -941,19 +941,23 @@ class AuthController extends Controller
         $pdata = DB::table('students')
             ->where('LRN', '=', $formField['LRN'])
             ->update([
+                'LRN' => $formField['LRN'],
+                'fname' => $formField['fname'],
+                'mname' => $formField['mname'],
+                'lname' => $formField['lname'],
+                'bdate' => $formField['bdate'],
                 'suffix' => $formField['suffix'],
                 'bplace' => $formField['bplace'],
                 'address' => $formField['address'],
                 'gender' => $formField['gender'],
                 'contact_no' => $formField['contact_no'],
-                'gender' => $formField['gender'],
                 'religion' => $formField['religion']
             ]);
        
         return $pdata;
     }
 
-    public function enrollmentDetails(Request $request){
+    public function enrollmentDetails(Request $request) {
         $formField = $request->validate([
             'LRN' => 'required|integer', 
             'grade_level' => 'required|string|max:255',
@@ -963,10 +967,22 @@ class AuthController extends Controller
             'public_private' => 'required|string|max:255',
             'guardian_name' => 'required|string|max:255',    
         ]);
-
-        $edata = Enrollment::create($formField);
-
-        return $edata;
+    
+        // Check if the enrollment already exists
+        $enrollment = Enrollment::where('LRN', $formField['LRN'])->first();
+    
+        // Set the date_register to now
+        $formField['date_register'] = now();
+    
+        if ($enrollment) {
+            // Update the existing enrollment record
+            $enrollment->update($formField);
+            return response()->json(['message' => 'Enrollment updated successfully.', 'data' => $enrollment], 200);
+        } else {
+            // Create a new enrollment record
+            $edata = Enrollment::create($formField);
+            return response()->json(['message' => 'Enrollment created successfully.', 'data' => $edata], 201);
+        }
     }
 
     public function enrollmentLogin(Request $request) {
