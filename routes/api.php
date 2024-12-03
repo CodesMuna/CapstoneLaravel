@@ -29,8 +29,8 @@ Route::post('/login', [AuthController::class, 'login']);
 // Route::apiResource('students', StudentController::class);
 
 
-// Route::middleware(['auth:sanctum'])->group(function () {
-//     Route::middleware(['Registrar'])->group(function () {
+Route::middleware(['auth:sanctum'])->group(function () {
+    Route::middleware(['Registrar'])->group(function () {
 
         Route::post('/logout', [AuthController::class, 'logout'])->middleware('auth:sanctum');
 
@@ -89,6 +89,8 @@ Route::post('/login', [AuthController::class, 'login']);
         Route::get('/displaymsg', [AuthController::class, 'displaymsg']);
         Route::post('/sendMessage', [AuthController::class, 'sendMessage']);
         Route::get('/getStudentParents', [AuthController::class, 'getStudentParents']);
+        Route::get('/getrecepeints', [AuthController::class, 'getrecepeints']);
+        Route::post('/composemessage', [AuthController::class, 'composenewmessage']);
 
         // Account 
         Route::put('/update-password', [AuthController::class, 'updatePass']);
@@ -102,8 +104,8 @@ Route::post('/login', [AuthController::class, 'login']);
         
             abort(404);
         });
-//     });
-// });
+    });
+});
 
 
 
@@ -114,6 +116,8 @@ Route::post('/login', [AuthController::class, 'login']);
 Route::post('/signup', [AuthController::class, 'signup']);
 Route::post('/enrollmentLogin', [AuthController::class, 'enrollmentLogin']);
 Route::get('/getStudentEnrollment', [AuthController::class, 'getStudentEnrollment']);
+Route::get('/getStudentPayment', [AuthController::class, 'getStudentPayment']);
 
 Route::post('/personalDetails', [AuthController::class, 'personalDetails']);
 Route::post('/enrollmentDetails', [AuthController::class, 'enrollmentDetails']);
+Route::post('/upload-payment', [AuthController::class, 'uploadPayment']);

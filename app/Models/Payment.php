@@ -14,6 +14,7 @@ class Payment extends Model
         'OR_number',
         'amount_paid',
         'proof_payment',
+        'date_of_payment',
         'description'
     ];
 }
