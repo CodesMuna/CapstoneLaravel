@@ -123,6 +123,8 @@ class AuthController extends Controller
                     parent_guardians.lname)
             END as sender_name'),
                     DB::raw('CONCAT(admins.fname, " ",COALESCE(LEFT(admins.mname, 1),""), ". ", admins.lname)as admin_name'))
+            ->havingRaw('sender_name IS NOT NULL')
+            ->orderBy('messages.created_at', 'desc')
             ->get();
     
         return $data;
@@ -138,7 +140,7 @@ class AuthController extends Controller
         $enrollments = DB::table('enrollments')
                         ->leftJoin('students', 'enrollments.LRN', '=', 'students.LRN')
                         ->where('enrollments.school_year', '=', '2024-2025')
-                        ->where('enrollments.regapproval_date', '!=', null)
+                        // ->where('enrollments.regapproval_date', '!=', null)
                         ->select('enrollments.*', 'students.*', 
                             DB::raw('CONCAT(students.fname, " ",LEFT(students.mname, 1), ". ", students.lname)as full_name'))
                         ->get();
@@ -717,6 +719,7 @@ class AuthController extends Controller
                                 " ", 
                                 parent_guardians.lname)
                     END as sender_name'))
+            ->havingRaw('sender_name IS NOT NULL')
             ->orderBy('messages.created_at', 'desc')
             ->get();
         
