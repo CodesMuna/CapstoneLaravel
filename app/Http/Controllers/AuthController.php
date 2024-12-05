@@ -41,7 +41,7 @@ class AuthController extends Controller
         ]);
 
         $admin = Admin::where('email', $request->email)
-            ->where('role', '=', 'Registrar')
+            // ->where('role', '=', 'Registrar')
             ->first();
         if(!$admin || !Hash::check($request->password,$admin->password)){
             return [
@@ -362,21 +362,147 @@ class AuthController extends Controller
         return response()->json($data);
     }
 
+    // public function addStudent(Request $request) {
+    //     $classIds = $request->input('cid'); // Expecting an array of class IDs
+    //     $lrn = $request->input('lrn');
+    
+    //     // Get student's grade level
+    //     $student = DB::table('students')
+    //         ->leftJoin('enrollments', 'students.LRN', '=', 'enrollments.LRN')
+    //         ->where('enrollments.LRN', '=', $lrn) // Ensure you filter by LRN
+    //         ->select('enrollments.grade_level')
+    //         ->first();
+    
+    //     // Check if student exists and retrieve grade level
+    //     if (!$student) {
+    //         return response()->json([
+    //             'success' => false,
+    //             'message' => 'Student not found.'
+    //         ], 404);
+    //     }
+    
+    //     $lvl = $student->grade_level;
+    
+    //     // Prepare data for insertion into rosters
+    //     $datarsoter = [];
+    //     foreach ($classIds as $cid) {
+    //         $datarsoter[] = [
+    //             'class_id' => $cid,
+    //             'LRN' => $lrn
+    //         ];
+    //     }
+    
+    //     // Insert multiple records into the rosters table
+    //     DB::table('rosters')->insert($datarsoter);
+    
+    //     // Prepare data for insertion into grades
+    //     $datagrades = [];
+        
+    //     // Determine grading terms based on grade level
+    //     if ($lvl >= 7 && $lvl <= 10) {
+    //         $gradingTerms = ['First Quarter', 'Second Quarter', 'Third Quarter', 'Fourth Quarter'];
+    //     } elseif ($lvl == 11 || $lvl == 12) {
+    //         $gradingTerms = ['Midterm', 'Final'];
+    //     } else {
+    //         return response()->json([
+    //             'success' => false,
+    //             'message' => 'Invalid grade level.'
+    //         ], 400);
+    //     }
+    
+    //     foreach ($classIds as $cid) {
+    //         foreach ($gradingTerms as $term) {
+    //             $datagrades[] = [
+    //                 'class_id' => $cid,
+    //                 'LRN' => $lrn,
+    //                 'term' => $term, // Include the term
+    //                 'permission' => 'none' // Set initial permission if needed
+    //             ];
+    //         }
+    //     }
+    
+    //     // Insert multiple records into the grades table
+    //     DB::table('grades')->insert($datagrades);
+    
+    //     return response()->json([
+    //         'success' => true,
+    //         'message' => 'Student added to classes successfully',
+    //     ]);
+    // }
+
     public function addStudent(Request $request) {
         $classIds = $request->input('cid'); // Expecting an array of class IDs
         $lrn = $request->input('lrn');
     
-        // Prepare data for insertion
-        $data = [];
+        // Get student's grade level
+        $student = DB::table('students')
+            ->leftJoin('enrollments', 'students.LRN', '=', 'enrollments.LRN')
+            ->where('enrollments.LRN', '=', $lrn) // Ensure you filter by LRN
+            ->select('enrollments.grade_level')
+            ->first();
+    
+        // Check if student exists and retrieve grade level
+        if (!$student) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Student not found.'
+            ], 404);
+        }
+    
+        $lvl = $student->grade_level;
+    
+        // Prepare data for insertion into rosters
+        $datarsoter = [];
         foreach ($classIds as $cid) {
-            $data[] = [
+            $datarsoter[] = [
                 'class_id' => $cid,
                 'LRN' => $lrn
             ];
         }
     
         // Insert multiple records into the rosters table
-        DB::table('rosters')->insert($data);
+        DB::table('rosters')->insert($datarsoter);
+    
+        // Check if grades already exist for this student
+        $existingGrades = DB::table('grades')
+            ->where('LRN', '=', $lrn)
+            ->exists(); // Check for existence
+    
+        if ($existingGrades) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Student added to roster successfully, but grades already exist. No new grades added.'
+            ]);
+        }
+    
+        // Prepare data for insertion into grades
+        $datagrades = [];
+        
+        // Determine grading terms based on grade level
+        if ($lvl >= 7 && $lvl <= 10) {
+            $gradingTerms = ['First Quarter', 'Second Quarter', 'Third Quarter', 'Fourth Quarter'];
+        } elseif ($lvl == 11 || $lvl == 12) {
+            $gradingTerms = ['Midterm', 'Final'];
+        } else {
+            return response()->json([
+                'success' => false,
+                'message' => 'Invalid grade level.'
+            ], 400);
+        }
+    
+        foreach ($classIds as $cid) {
+            foreach ($gradingTerms as $term) {
+                $datagrades[] = [
+                    'class_id' => $cid,
+                    'LRN' => $lrn,
+                    'term' => $term, // Include the term
+                    'permission' => 'none' // Set initial permission if needed
+                ];
+            }
+        }
+    
+        // Insert multiple records into the grades table only if no existing grades were found
+        DB::table('grades')->insert($datagrades);
     
         return response()->json([
             'success' => true,
@@ -391,16 +517,48 @@ class AuthController extends Controller
         Log::info('Removing student with LRN: ' . $lrn);
     
         // Remove the student from the roster based on LRN
-        $deletedRows = DB::table('rosters')->where('LRN', $lrn)->delete();
+        DB::table('rosters')->where('LRN', $lrn)->delete();
     
-        // Log the number of deleted rows
-        Log::info('Number of deleted rows: ' . $deletedRows);
+        // Check if there are any grades with non-null values for this student
+        $grades = DB::table('grades')
+            ->where('LRN', $lrn)
+            ->whereNotNull('grade') // Ensure we only consider rows where grade is not null
+            ->get();
+    
+        if ($grades->isEmpty()) {
+            // If no grades are found with a non-null value, delete all grades for this student
+            DB::table('grades')->where('LRN', $lrn)->delete();
+            Log::info('All grades deleted for LRN: ' . $lrn);
+        } else {
+            // Log that some grades were not deleted due to having non-null values
+            Log::info('Grades not deleted for LRN: ' . $lrn . ' because they have non-null values.');
+        }
     
         return response()->json([
             'success' => true,
             'message' => 'Student removed from all classes successfully',
         ]);
     }
+
+    // public function removeStudent(Request $request) {
+    //     $lrn = $request->input('lrn'); // Expecting the LRN of the student to be removed
+    
+    //     // Log the received data
+    //     Log::info('Removing student with LRN: ' . $lrn);
+    
+    //     // Remove the student from the roster based on LRN
+    //     $deletedRows = DB::table('rosters')->where('LRN', $lrn)->delete();
+        
+    //     $deletedRows = DB::table('grades')->where('LRN', $lrn)->delete();
+    
+    //     // Log the number of deleted rows
+    //     Log::info('Number of deleted rows: ' . $deletedRows);
+    
+    //     return response()->json([
+    //         'success' => true,
+    //         'message' => 'Student removed from all classes successfully',
+    //     ]);
+    // }
 
     public function getClass(){
         $data = DB::table('classes')
@@ -616,12 +774,57 @@ class AuthController extends Controller
         ];
     }
 
+    public function getGradesTP(Request $request) {
+        $grades = DB::table('grades')->select('term', 'permission')->get();
+        return response()->json($grades);
+    }
+
+    public function enableTerm(Request $request) {  
+        Log::info('Enable Term Request:', $request->all());
+        
+        $term = $request->input('term');
+        $affectedRows = DB::table('grades')
+            ->where('term', '=', $term)
+            ->update(['permission' => 'on']);
+        
+        if ($affectedRows > 0) {
+            return response()->json(['success' => 'Term is now enabled']);
+        } else {
+            return response()->json(['error' => 'No records found for this term']);
+        }
+    }
+
+    public function disableTerm(Request $request) {  
+        Log::info('Disable Term Request:', $request->all());
+        
+        $term = $request->input('term');
+        $affectedRows = DB::table('grades')
+            ->where('term', '=', $term)
+            ->update(['permission' => 'none']);
+        
+        if ($affectedRows > 0) {
+            return response()->json(['success' => 'Term is now disabled']);
+        } else {
+            return response()->json(['error' => 'No records found for this term']);
+        }
+    }
+
+    // public function disableTerm($term) {
+    //     DB::table('grades')
+    //         ->where('term', $term)
+    //         ->update(['permission' => 'none']);
+     
+    //     return response()->json(['success' => 'Term is now disabled']);
+    // }
+
 
     // Message Functions
 
     public function getStudentParents() {
         // Fetch students
         $students = DB::table('students')
+        ->leftJoin('enrollments', 'students.LRN', '=', 'enrollments.LRN')
+        ->where('enrollments.regapproval_date', '!=', null)
         ->select('students.LRN', DB::raw("
                 CONCAT(
                     students.fname, 
@@ -725,46 +928,6 @@ class AuthController extends Controller
         
         return $msg;
     }
-
-    // public function getMessages(Request $request) {
-    //     $uid = $request->input('uid');
-    
-    //     // Main query to get messages
-    //     $msg = DB::table('messages')
-    //         ->leftJoin('students', function ($join) {
-    //             $join->on('messages.message_sender', '=', 'students.LRN');
-    //         })
-    //         ->leftJoin('admins', function ($join) {
-    //             $join->on('messages.message_sender', '=', 'admins.admin_id');
-    //         })
-    //         ->leftJoin('parent_guardians', function ($join) {
-    //             $join->on('messages.message_sender', '=', 'parent_guardians.guardian_id');
-    //         })
-    //         ->where('messages.message_reciever', '=', $uid) // Filter by receiver
-    //         ->select('messages.*', 
-    //         DB::raw('CASE 
-    //                 WHEN messages.message_sender IN (SELECT LRN FROM students) THEN 
-    //                     CONCAT(students.fname, 
-    //                         IFNULL(CONCAT(" ", LEFT(students.mname, 1), "."), ""), 
-    //                         " ", 
-    //                         students.lname)
-    //                 WHEN messages.message_sender IN (SELECT admin_id FROM admins) THEN 
-    //                     CONCAT(admins.fname, 
-    //                         IFNULL(CONCAT(" ", LEFT(admins.mname, 1), "."), ""), 
-    //                         " ", 
-    //                         admins.lname)
-    //                 WHEN messages.message_sender IN (SELECT guardian_id FROM parent_guardians) THEN 
-    //                     CONCAT(parent_guardians.fname, 
-    //                         IFNULL(CONCAT(" ", LEFT(parent_guardians.mname, 1), "."), ""), 
-    //                         " ", 
-    //                         parent_guardians.lname)
-    //             END as sender_name'))
-    //         ->orderBy('messages.created_at', 'desc')
-    //         ->get();
-        
-    //     return $msg;
-        
-    // }
 
     public function getConvo(Request $request, $sid) {
         // Initialize the response variable

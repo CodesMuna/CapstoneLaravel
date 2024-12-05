@@ -29,8 +29,8 @@ Route::post('/login', [AuthController::class, 'login']);
 // Route::apiResource('students', StudentController::class);
 
 
-Route::middleware(['auth:sanctum'])->group(function () {
-    Route::middleware(['Registrar'])->group(function () {
+// Route::middleware(['auth:sanctum'])->group(function () {
+//     Route::middleware(['Registrar'])->group(function () {
 
         Route::post('/logout', [AuthController::class, 'logout'])->middleware('auth:sanctum');
 
@@ -80,6 +80,11 @@ Route::middleware(['auth:sanctum'])->group(function () {
         Route::get('/getGrades/{lrn}/{syr}', [AuthController::class, 'getGrades']);
         Route::post('/permit', [AuthController::class, 'permit']);
         Route::post('/decline', [AuthController::class, 'decline']);
+        Route::get('/getTerms', [AuthController::class, 'getTerms']);
+        Route::get('/getSHTerms', [AuthController::class, 'getSHTerms']);
+        Route::get('/getGradesTP', [AuthController::class, 'getGradesTP']);
+        Route::post('/enableTerm', [AuthController::class, 'enableTerm']);
+        Route::post('/disableTerm', [AuthController::class, 'disableTerm']);
 
         //Message Routes
 
@@ -104,8 +109,8 @@ Route::middleware(['auth:sanctum'])->group(function () {
         
             abort(404);
         });
-    });
-});
+//     });
+// });
 
 
 
