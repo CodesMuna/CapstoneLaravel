@@ -41,7 +41,7 @@ class AuthController extends Controller
         ]);
 
         $admin = Admin::where('email', $request->email)
-            // ->where('role', '=', 'Registrar')
+            ->where('role', '=', 'Registrar')
             ->first();
         if(!$admin || !Hash::check($request->password,$admin->password)){
             return [
@@ -83,22 +83,17 @@ class AuthController extends Controller
     public function getInquiries(Request $request){
         $uid = $request->input('uid');
 
-        $latestMessages = DB::table('messages')
-        ->select('message_sender', DB::raw('MAX(created_at) as max_created_at'))
-        ->groupBy('message_sender');
-
         $data = DB::table('messages')
             ->leftJoin('students', function ($join) {
                 $join->on('messages.message_sender', '=', 'students.LRN');
             })
+            ->leftJoin('enrollments', function ($join) {
+                $join->on('students.LRN', '=', 'enrollments.LRN');
+            })
             ->leftJoin('parent_guardians', function ($join) {
                 $join->on('messages.message_sender', '=', 'parent_guardians.guardian_id');
-            })
+            })     
             ->leftJoin('admins', 'messages.message_reciever', '=', 'admins.admin_id')
-            // ->joinSub($latestMessages, 'latest_messages', function ($join) {
-            //     $join->on('messages.message_sender', '=', 'latest_messages.message_sender')
-            //          ->on('messages.created_at', '=', 'latest_messages.max_created_at');
-            // })
             ->whereNotIn('messages.message_sender', function ($query) {
                 $query->select('admin_id')->from('admins');
             })
@@ -114,15 +109,24 @@ class AuthController extends Controller
                             ELSE "" 
                         END, 
                     students.lname)
-                WHEN messages.message_sender IN (SELECT guardian_id FROM parent_guardians) THEN 
-                    CONCAT(parent_guardians.fname, " ", 
+                    WHEN messages.message_sender IN (SELECT guardian_id FROM parent_guardians) THEN 
+                        CONCAT(parent_guardians.fname, " ", 
+                            CASE 
+                                WHEN parent_guardians.mname IS NOT NULL THEN CONCAT(LEFT(parent_guardians.mname, 1), ". ") 
+                                ELSE "" 
+                            END, 
+                        parent_guardians.lname)
+                    END as sender_name'),
+                    DB::raw('CONCAT(admins.fname, " ",COALESCE(LEFT(admins.mname, 1),""), ". ", admins.lname)as admin_name'),
+                    DB::raw('CASE 
+                    WHEN messages.message_sender IN (SELECT LRN FROM students) THEN 
                         CASE 
-                            WHEN parent_guardians.mname IS NOT NULL THEN CONCAT(LEFT(parent_guardians.mname, 1), ". ") 
-                            ELSE "" 
-                        END, 
-                    parent_guardians.lname)
-            END as sender_name'),
-                    DB::raw('CONCAT(admins.fname, " ",COALESCE(LEFT(admins.mname, 1),""), ". ", admins.lname)as admin_name'))
+                            WHEN enrollments.strand IS NULL THEN enrollments.grade_level 
+                            ELSE CONCAT(enrollments.grade_level, " ", enrollments.strand) 
+                        END
+                    ELSE NULL
+                    END as label')
+                    )
             ->havingRaw('sender_name IS NOT NULL')
             ->orderBy('messages.created_at', 'desc')
             ->get();
@@ -132,17 +136,34 @@ class AuthController extends Controller
 
     //Enrollment Functions
 
-    public function enrollments(){
-        $currentYear = now()->year;
-        $nextYear = $currentYear + 1;
-        $schoolYear = $currentYear . '-' . $nextYear;
-        // $enrollments  = Enrollment::with('student')->get();
+    public function enrollments() {
+        // Get the current date
+        $currentDate = now();
+    
+        // Determine the school year based on the current month
+        if ($currentDate->month >= 6) { // June or later
+            $currentYear = $currentDate->year;
+            $nextYear = $currentYear + 1;
+        } else { // Before June 
+            $currentYear = $currentDate->year - 1;
+            $nextYear = $currentYear + 1;
+        }
+    
+        // Format school year as "YYYY-YYYY"
+        $schoolYear = "{$currentYear}-{$nextYear}";
+    
+        // Query enrollments for the calculated school year
         $enrollments = DB::table('enrollments')
                         ->leftJoin('students', 'enrollments.LRN', '=', 'students.LRN')
-                        ->where('enrollments.school_year', '=', '2024-2025')
-                        // ->where('enrollments.regapproval_date', '!=', null)
+                        ->leftJoin('payments', 'students.LRN', '=', 'payments.LRN')
+                        ->where('enrollments.school_year', '=', $schoolYear)
                         ->select('enrollments.*', 'students.*', 
-                            DB::raw('CONCAT(students.fname, " ",LEFT(students.mname, 1), ". ", students.lname)as full_name'))
+                        DB::raw('CASE 
+                        WHEN students.mname IS NOT NULL AND students.mname <> "" THEN 
+                            CONCAT(students.fname, " ", LEFT(students.mname, 1), ". ", students.lname) 
+                        ELSE 
+                            CONCAT(students.fname, " ", students.lname) 
+                    END AS full_name'))
                         ->get();
                         
         return $enrollments;
@@ -260,13 +281,35 @@ class AuthController extends Controller
     }
 
     public function getRosters(){
+        $currentDate = now();
+    
+        // Determine the school year based on the current month
+        if ($currentDate->month >= 6) { // June or later
+            $currentYear = $currentDate->year;
+            $nextYear = $currentYear + 1;
+        } else { // Before June 
+            $currentYear = $currentDate->year - 1;
+            $nextYear = $currentYear + 1;
+        }
+    
+        // Format school year as "YYYY-YYYY"
+        $schoolYear = "{$currentYear}-{$nextYear}";
+
         $rosters = DB::table('rosters')
             ->join('students', 'rosters.LRN', '=', 'students.LRN')
+            ->join('enrollments', 'students.LRN', '=', 'enrollments.LRN')
             ->join('classes', 'rosters.class_id', '=', 'classes.class_id')
             ->join('admins', 'classes.admin_id', '=', 'admins.admin_id')
             ->join('sections', 'classes.section_id', '=', 'sections.section_id')
             ->leftJoin('subjects', 'classes.subject_id', '=', 'subjects.subject_id')
-            ->select('rosters.*', 'classes.*', 'admins.*', 'subjects.*', 'sections.*','students.contact_no', DB::raw('CONCAT(students.fname, " ",LEFT(students.mname, 1), ". ", students.lname)as student_name'))
+            ->where('enrollments.school_year', '=', $schoolYear)
+            ->select('rosters.*', 'classes.*', 'admins.*', 'subjects.*', 'sections.*','students.contact_no', 
+            DB::raw('CASE 
+            WHEN students.mname IS NOT NULL AND students.mname <> "" THEN 
+                CONCAT(students.fname, " ", LEFT(students.mname, 1), ". ", students.lname) 
+            ELSE 
+                CONCAT(students.fname, " ", students.lname) 
+            END AS student_name'))            
             ->get();
 
         return $rosters;
@@ -277,13 +320,29 @@ class AuthController extends Controller
         $section = $request->input('section');
         $strand = $request->input('strand');
         $gender = $request->input('gender');
+
+        $currentDate = now();
+    
+        // Determine the school year based on the current month
+        if ($currentDate->month >= 6) { // June or later
+            $currentYear = $currentDate->year;
+            $nextYear = $currentYear + 1;
+        } else { // Before June 
+            $currentYear = $currentDate->year - 1;
+            $nextYear = $currentYear + 1;
+        }
+    
+        // Format school year as "YYYY-YYYY"
+        $schoolYear = "{$currentYear}-{$nextYear}";
         
         $rosters = DB::table('rosters')
             ->join('students', 'rosters.LRN', '=', 'students.LRN')
+            ->join('enrollments', 'students.LRN', '=', 'enrollments.LRN')
             ->join('classes', 'rosters.class_id', '=', 'classes.class_id')
             ->join('admins', 'classes.admin_id', '=', 'admins.admin_id')
             ->join('sections', 'classes.section_id', '=', 'sections.section_id')
             ->leftJoin('subjects', 'classes.subject_id', '=', 'subjects.subject_id')
+            ->where('enrollments.school_year', '=', $schoolYear)
             ->where('sections.grade_level', '=', $gradeLevel)
             ->where('sections.section_name', '=', $section)
             ->when($strand, function ($query, $strand) {
@@ -295,7 +354,12 @@ class AuthController extends Controller
                 return $query->where('students.gender', '=', $gender);
             })
             ->select('rosters.*', 'classes.*', 'admins.*', 'subjects.*', 'students.contact_no', 'students.gender',
-                DB::raw('CONCAT(students.fname, " ",LEFT(students.mname, 1), ". ", students.lname)as student_name'))
+            DB::raw('CASE 
+            WHEN students.mname IS NOT NULL AND students.mname <> "" THEN 
+                CONCAT(students.fname, " ", LEFT(students.mname, 1), ". ", students.lname) 
+            ELSE 
+                CONCAT(students.fname, " ", students.lname) 
+            END AS student_name'))
             ->get();
         
         return $rosters;
@@ -304,6 +368,20 @@ class AuthController extends Controller
     public function getRosterInfo(Request $request) {
         $classIds = explode(',', $request->input('classIds')); // Split the comma-separated string into an array
     
+        $currentDate = now();
+    
+        // Determine the school year based on the current month
+        if ($currentDate->month >= 6) { // June or later
+            $currentYear = $currentDate->year;
+            $nextYear = $currentYear + 1;
+        } else { // Before June 
+            $currentYear = $currentDate->year - 1;
+            $nextYear = $currentYear + 1;
+        }
+    
+        // Format school year as "YYYY-YYYY"
+        $schoolYear = "{$currentYear}-{$nextYear}";
+
         $data = DB::table('rosters')
             ->join('students', 'rosters.LRN', '=', 'students.LRN')
             ->join('classes', 'rosters.class_id', '=', 'classes.class_id')
@@ -311,7 +389,12 @@ class AuthController extends Controller
             ->leftJoin('subjects', 'classes.subject_id', '=', 'subjects.subject_id')
             ->whereIn('rosters.class_id', $classIds) // Use whereIn to filter by multiple class IDs
             ->select('rosters.*', 'students.*', 'classes.*', 'subjects.*', 'sections.*', 
-                DB::raw('CONCAT(students.fname, " ", LEFT(students.mname, 1), ". ", students.lname) as student_name'))
+            DB::raw('CASE 
+            WHEN students.mname IS NOT NULL AND students.mname <> "" THEN 
+                CONCAT(students.fname, " ", LEFT(students.mname, 1), ". ", students.lname) 
+            ELSE 
+                CONCAT(students.fname, " ", students.lname) 
+            END AS student_name'))
             ->get();
     
         return response()->json($data);
@@ -345,9 +428,19 @@ class AuthController extends Controller
     }
 
     public function getEnrolees($lvl){
-        $currentYear = now()->year;
-        $nextYear = $currentYear + 1;
-        $schoolYear = $currentYear . '-' . $nextYear;
+        $currentDate = now();
+    
+        // Determine the school year based on the current month
+        if ($currentDate->month >= 6) { // June or later
+            $currentYear = $currentDate->year;
+            $nextYear = $currentYear + 1;
+        } else { // Before June 
+            $currentYear = $currentDate->year - 1;
+            $nextYear = $currentYear + 1;
+        }
+    
+        // Format school year as "YYYY-YYYY"
+        $schoolYear = "{$currentYear}-{$nextYear}";
         
         $data = DB::table('enrollments')
             ->join('students', 'enrollments.LRN', '=', 'students.LRN')
@@ -356,79 +449,17 @@ class AuthController extends Controller
             ->where('enrollments.school_year', '=', $schoolYear)
             ->where('enrollments.regapproval_date', '!=', '0000-00-00')
             ->whereNull('rosters.LRN')
-            ->select('students.*','enrollments.*', DB::raw('CONCAT(students.fname, " ",LEFT(students.mname, 1), ". ", students.lname)as student_name'))
+            ->select('students.*','enrollments.*', 
+            DB::raw('CASE 
+            WHEN students.mname IS NOT NULL AND students.mname <> "" THEN 
+                CONCAT(students.fname, " ", LEFT(students.mname, 1), ". ", students.lname) 
+            ELSE 
+                CONCAT(students.fname, " ", students.lname) 
+            END AS student_name'))
             ->get();
         
         return response()->json($data);
     }
-
-    // public function addStudent(Request $request) {
-    //     $classIds = $request->input('cid'); // Expecting an array of class IDs
-    //     $lrn = $request->input('lrn');
-    
-    //     // Get student's grade level
-    //     $student = DB::table('students')
-    //         ->leftJoin('enrollments', 'students.LRN', '=', 'enrollments.LRN')
-    //         ->where('enrollments.LRN', '=', $lrn) // Ensure you filter by LRN
-    //         ->select('enrollments.grade_level')
-    //         ->first();
-    
-    //     // Check if student exists and retrieve grade level
-    //     if (!$student) {
-    //         return response()->json([
-    //             'success' => false,
-    //             'message' => 'Student not found.'
-    //         ], 404);
-    //     }
-    
-    //     $lvl = $student->grade_level;
-    
-    //     // Prepare data for insertion into rosters
-    //     $datarsoter = [];
-    //     foreach ($classIds as $cid) {
-    //         $datarsoter[] = [
-    //             'class_id' => $cid,
-    //             'LRN' => $lrn
-    //         ];
-    //     }
-    
-    //     // Insert multiple records into the rosters table
-    //     DB::table('rosters')->insert($datarsoter);
-    
-    //     // Prepare data for insertion into grades
-    //     $datagrades = [];
-        
-    //     // Determine grading terms based on grade level
-    //     if ($lvl >= 7 && $lvl <= 10) {
-    //         $gradingTerms = ['First Quarter', 'Second Quarter', 'Third Quarter', 'Fourth Quarter'];
-    //     } elseif ($lvl == 11 || $lvl == 12) {
-    //         $gradingTerms = ['Midterm', 'Final'];
-    //     } else {
-    //         return response()->json([
-    //             'success' => false,
-    //             'message' => 'Invalid grade level.'
-    //         ], 400);
-    //     }
-    
-    //     foreach ($classIds as $cid) {
-    //         foreach ($gradingTerms as $term) {
-    //             $datagrades[] = [
-    //                 'class_id' => $cid,
-    //                 'LRN' => $lrn,
-    //                 'term' => $term, // Include the term
-    //                 'permission' => 'none' // Set initial permission if needed
-    //             ];
-    //         }
-    //     }
-    
-    //     // Insert multiple records into the grades table
-    //     DB::table('grades')->insert($datagrades);
-    
-    //     return response()->json([
-    //         'success' => true,
-    //         'message' => 'Student added to classes successfully',
-    //     ]);
-    // }
 
     public function addStudent(Request $request) {
         $classIds = $request->input('cid'); // Expecting an array of class IDs
@@ -585,13 +616,27 @@ class AuthController extends Controller
     }
 
     public function getClassGrades(Request $request) {
+        $currentDate = now();
+    
+        // Determine the school year based on the current month
+        if ($currentDate->month >= 6) { // June or later
+            $currentYear = $currentDate->year;
+            $nextYear = $currentYear + 1;
+        } else { // Before June 
+            $currentYear = $currentDate->year - 1;
+            $nextYear = $currentYear + 1;
+        }
+    
+        // Format school year as "YYYY-YYYY"
+        $schoolYear = "{$currentYear}-{$nextYear}";
+
         $gradeLevel = $request->input('gradelevel');
         $section = $request->input('section');
         $strand = $request->input('strand');
         $subject = $request->input('subject');
         $gender = $request->input('gender');
     
-        // Log the parameters for debugging
+        // Log the parameters for debugging 
         Log::info('Parameters received:', [
             'gradeLevel' => $gradeLevel,
             'section' => $section,
@@ -611,6 +656,7 @@ class AuthController extends Controller
                 $join->on('rosters.LRN', '=', 'grades.LRN')
                      ->on('rosters.class_id', '=', 'grades.class_id'); // Ensure correct join on class_id
             })
+            ->where('enrollments.school_year', '=', $schoolYear)
             ->where('sections.grade_level', '=', $gradeLevel)
             ->where('sections.section_name', '=', $section)
             ->where('subjects.subject_name', '=', $subject) // Filter by subject name
@@ -623,7 +669,12 @@ class AuthController extends Controller
             ->select(
                 'students.LRN',
                 'students.gender',
-                DB::raw('CONCAT(students.fname, " ", LEFT(students.mname, 1), ". ", students.lname) AS student_name'),
+                DB::raw('CASE 
+                WHEN students.mname IS NOT NULL AND students.mname <> "" THEN 
+                    CONCAT(students.fname, " ", LEFT(students.mname, 1), ". ", students.lname) 
+                ELSE 
+                    CONCAT(students.fname, " ", students.lname) 
+                END AS student_name'),
                 'students.contact_no',
                 'subjects.subject_id',
                 'subjects.subject_name',
@@ -683,7 +734,13 @@ class AuthController extends Controller
             ->when($gender, function ($query, $gender) {
                 return $query->where('students.gender', '=', $gender);
             })
-            ->select('rosters.*', 'classes.*', 'admins.*', 'subjects.*', 'students.contact_no', 'students.gender',DB::raw('CONCAT(students.fname, " ",LEFT(students.mname, 1), ". ", students.lname)as student_name'))
+            ->select('rosters.*', 'classes.*', 'admins.*', 'subjects.*', 'students.contact_no', 'students.gender',
+            DB::raw('CASE 
+            WHEN students.mname IS NOT NULL AND students.mname <> "" THEN 
+                CONCAT(students.fname, " ", LEFT(students.mname, 1), ". ", students.lname) 
+            ELSE 
+                CONCAT(students.fname, " ", students.lname) 
+            END AS student_name'))            
             ->get();
         
         return $rosters;
