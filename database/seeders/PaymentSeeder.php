@@ -20,7 +20,7 @@ class PaymentSeeder extends Seeder
         $usedLRNs = [];
 
         // Generate 84 payment records
-        for ($i = 0; $i < 50; $i++) {
+        for ($i = 0; $i < 805; $i++) {
             do {
                 $selectedLRN = $faker->randomElement($lrns);
             } while (in_array($selectedLRN, $usedLRNs));

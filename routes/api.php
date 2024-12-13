@@ -68,7 +68,7 @@ Route::post('/login', [AuthController::class, 'login']);
         Route::post('/addStudent', [AuthController::class, 'addStudent']);
         // Route::delete('/removeStudent/{rid}', [AuthController::class, 'removeStudent']);
         Route::delete('/removeStudent', [AuthController::class, 'removeStudent']);
-        Route::get('/getEnrolees/{lvl}', [AuthController::class, 'getEnrolees']);
+        Route::get('/getEnrolees', [AuthController::class, 'getEnrolees']);
 
         Route::get('/getClass', [AuthController::class, 'getClass']);
 
@@ -96,6 +96,8 @@ Route::post('/login', [AuthController::class, 'login']);
         Route::get('/getStudentParents', [AuthController::class, 'getStudentParents']);
         Route::get('/getrecepeints', [AuthController::class, 'getrecepeints']);
         Route::post('/composemessage', [AuthController::class, 'composenewmessage']);
+        Route::post('/markAsRead', [AuthController::class, 'markAsRead']);
+        Route::get('/getUnreadCount', [AuthController::class, 'getUnreadCount']);
 
         // Account 
         Route::put('/update-password', [AuthController::class, 'updatePass']);

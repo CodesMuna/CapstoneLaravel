@@ -7,6 +7,8 @@ use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Faker\Factory as Faker;
 
+use function PHPSTORM_META\map;
+
 class StudentSeeder extends Seeder
 {
     /**
@@ -113,7 +115,13 @@ class StudentSeeder extends Seeder
             "Veronica", "Ricardo", "Patricia", "Alfonso", "Rosalinda",
             "Dante", "Lourdes", "Nina", "Florentino", "John Lloyd", "Glen", "Heaven", "Christian", "Albert", 
             "Jezryl", "Dan", "Dionece", "Elzaina", "Arold", "Rianne", "Eleizer", "Lance", "Marlon", "Ollem",
-            "Carl", "Eugene", "Raygienald", "Arjay", "Jhonnel"
+            "Carl", "Eugene", "Raygienald", "Arjay", "Jhonnel", 'John Paul', 'Gloshnee',
+            'Joven', 'Gem', 'Marlon', 'Shelumiel', 'Eriza', 'Lois', 'Kaye', 'Joyse', 'Dyien', 'Jana',
+            'Daphnie', 'Alyssa', 'Alexander', 'Jayvee', 'Zlenmiro', 'Ericson', 'Patricia',
+            'Nathanael', 'Edrian', 'Kenneth', 'Hannah', 'Erica', 'Angel', 'Ace', 'Adrian',
+            'Abegail', 'Louis', 'Ken', 'Jedz', 'Khlyde', 'Queruv', 'Jereign', 'Frances', 
+            'Arabelah', 'Sophia', 'Jelwyn', 'Vivern', 'Carla', 'Jomar', 'Andoni', 'Ayen',
+            'Fritz', 'Dianne', 'Heavenson'
         ];
         
         return $firstNames[array_rand($firstNames)];
@@ -132,7 +140,15 @@ class StudentSeeder extends Seeder
             "Cruz", "Garcia", "Flores", "Torres", "Alvarez",
             "Martinez", "Morales", "Castillo", "Panganiban",
             "De Leon", "Villanueva", "Santiago", "Luna",
-            "Dizon", "Ocampo", "Bacalso"
+            "Dizon", "Ocampo", "Bacalso", "Subido", "Dacaymat", "Lozada",
+            "Tomacder", "Mamato", "Collano", "Pasiwen", "Castaño", "Sencio",
+            "Agcaoili", "De Guzman", "Glee", "Malayo", "Nabor", "Curameng", "Bronuela",
+            "Manaois", "Caluza", "Rullan", "Redila", "Escalona", "Niñalga", "Ayson",
+            "Miranda", "Ofiaza", "Esquero", "Manangan", 'Bacani', 'Laureta', 'Trono', 'Viernes',
+            'Fabroa', 'Dotimas', 'dela Cruz', 'Reyes', 'Tugay', 'Vallejo', 'Domingo', 'Melendez',
+            'Belandres', 'Ramos', 'Arriesgado', 'Cornejo', 'Decano', 'Movida', 'Santos', 'Ancheta',
+            'Talania', 'Etrata', 'De Clerq', 'Caingat', 'Taruc', 'Sembrano', 'Del Valle', 'Acosta',
+            'Esteves', 'Espino', 'Terte', 'Tacata', 'Poli', 'Orpiano', 'Yuhanon'
         ];
         
         return $lastNames[array_rand($lastNames)];

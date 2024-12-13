@@ -199,6 +199,37 @@ class AuthController extends Controller
         return response()->json(['message' => 'Enrollment deleted successfully']);
     }
 
+    public function updateStud(Request $request) {
+        // Validate incoming request
+        $request->validate([
+            'enrol_id' => 'required|integer|exists:admins,admin_id',
+            'oldPassword' => 'nullable|string', // Make oldPassword optional
+            'newPassword' => 'nullable|string|min:8|confirmed', // Allow newPassword to be optional
+            'fname' => 'required|string|max:255',
+            'mname' => 'required|string|max:255',
+            'lname' => 'required|string|max:255',
+            'email' => 'required|email|max:255|unique:admins,email,' . $request->admin_id . ',admin_id', // Check uniqueness for email
+            'address' => 'required|string|max:255',
+        ]);
+    
+        // Retrieve user
+        $user = Admin::find($request->admin_id);
+    
+        // Update other user details
+        $user->fname = $request->fname;
+        $user->mname = $request->mname;
+        $user->lname = $request->lname;
+        $user->email = $request->email;
+        $user->address = $request->address;
+    
+        $user->save(); // Save all changes
+    
+        // Log successful update
+        Log::info('User  details updated successfully for admin_id: ' . $request->admin_id);
+    
+        return response()->json(['message' => 'User  details updated successfully']);
+    }
+
     //Class Functions
 
     public function getClasses(){
@@ -233,23 +264,54 @@ class AuthController extends Controller
     }
 
     public function getSubjects(Request $request) {
-        $gradeLevel = $request->query('gradeLevel'); // Get the grade level from the query parameters
-        $strand = $request->query('strand'); // Get the strand from the query parameters
-
-        $query = DB::table('subjects')->select('subjects.*');
+        $gradeLevel = $request->input('gradelevel');
+        $strand = $request->input('strand');
+        $sem = $request->input('sem');
     
-        if ($gradeLevel) {
-            $query->where('grade_level', $gradeLevel);
-        }
+        $query = DB::table('classes')
+            ->leftJoin('subjects', 'classes.subject_id', '=', 'subjects.subject_id')
+            ->when($gradeLevel, function ($query) use ($gradeLevel) {
+                $query->where('subjects.grade_level', $gradeLevel);
+            })
+            ->when($strand, function ($query) use ($strand) {
+                $query->where('subjects.strand', $strand);
+            })
+            ->when($sem, function ($query) use ($sem) {
+                $query->where('classes.semester', $sem);
+            });
     
-        if ($strand) {
-            $query->where('strand', $strand); // Assuming 'strand' is a column in your sections table
-        }
-
         $subjects = $query->get();
     
         return response()->json($subjects);
     }
+
+    // public function getSubjects(Request $request) {
+    //     $gradeLevel = $request->input('gradeLevel'); // Get the grade level from the query parameters
+    //     $strand = $request->input('strand'); // Get the strand from the query parameters
+    //     $sem = $request->input('sem'); // Get the semester from the query parameters
+    
+    //     $query = DB::table('classes')
+    //         ->leftJoin('subjects', 'classes.subject_id', '=', 'subjects.subject_id')
+    //         ->select('subjects.*', 'classes.semester');
+    
+    //     // Apply filters based on the provided parameters
+    //     if ($gradeLevel) {
+    //         $query->where('subjects.grade_level', $gradeLevel);
+    //     }
+    
+    //     if ($strand) {
+    //         $query->where('subjects.strand', $strand);
+    //     }
+    
+    //     if ($sem) {
+    //         $query->where('classes.semester', $sem);
+    //     }
+    
+    //     // Execute the query and get the results
+    //     $subjects = $query->get();
+    
+    //     return response()->json($subjects);
+    // }
 
     
 
@@ -427,7 +489,10 @@ class AuthController extends Controller
         }
     }
 
-    public function getEnrolees($lvl){
+    public function getEnrolees(Request $request){
+        $gradeLevel = $request->input('gradeLevel'); // Get the grade level from the query parameters
+        $strand = $request->input('strand');
+
         $currentDate = now();
     
         // Determine the school year based on the current month
@@ -441,13 +506,16 @@ class AuthController extends Controller
     
         // Format school year as "YYYY-YYYY"
         $schoolYear = "{$currentYear}-{$nextYear}";
-        
-        $data = DB::table('enrollments')
+
+
+        if ($strand == '-'){
+            $data = DB::table('enrollments')
             ->join('students', 'enrollments.LRN', '=', 'students.LRN')
             ->leftJoin('rosters', 'students.LRN', '=', 'rosters.LRN')
-            ->where('enrollments.grade_level', '=', $lvl)
+            ->where('enrollments.grade_level', '=', $gradeLevel)
+            ->where('enrollments.strand', '=', null)
             ->where('enrollments.school_year', '=', $schoolYear)
-            ->where('enrollments.regapproval_date', '!=', '0000-00-00')
+            ->where('enrollments.regapproval_date', '!=', null)
             ->whereNull('rosters.LRN')
             ->select('students.*','enrollments.*', 
             DB::raw('CASE 
@@ -457,6 +525,25 @@ class AuthController extends Controller
                 CONCAT(students.fname, " ", students.lname) 
             END AS student_name'))
             ->get();
+        } else {
+            $data = DB::table('enrollments')
+            ->join('students', 'enrollments.LRN', '=', 'students.LRN')
+            ->leftJoin('rosters', 'students.LRN', '=', 'rosters.LRN')
+            ->where('enrollments.grade_level', '=', $gradeLevel)
+            ->where('enrollments.strand', '=', $strand)
+            ->where('enrollments.school_year', '=', $schoolYear)
+            ->where('enrollments.regapproval_date', '!=', null)
+            ->whereNull('rosters.LRN')
+            ->select('students.*','enrollments.*', 
+            DB::raw('CASE 
+            WHEN students.mname IS NOT NULL AND students.mname <> "" THEN 
+                CONCAT(students.fname, " ", LEFT(students.mname, 1), ". ", students.lname) 
+            ELSE 
+                CONCAT(students.fname, " ", students.lname) 
+            END AS student_name'))
+            ->get();
+        }
+     
         
         return response()->json($data);
     }
@@ -794,7 +881,7 @@ class AuthController extends Controller
             })
             ->leftJoin('sections', 'classes.section_id', '=', 'sections.section_id')
             ->where('sections.grade_level', '=', $enrollments->grade_level)
-            ->select('sections.*', 'subjects.subject_name', 'grades.grade', 'grades.term', 'classes.*')
+            ->select('sections.*', 'subjects.subject_name', 'grades.grade', 'grades.term', 'classes.semester')
             ->get()
             ->groupBy('subject_name');
         
@@ -807,9 +894,15 @@ class AuthController extends Controller
                 'Third Quarter' => null,
                 'Fourth Quarter' => null,
                 'Midterm' => null,
-                'Final' => null
+                'Final' => null,
+                'Semester' => null
             ];
             foreach ($subjectGrades as $grade) {
+                // Only set the semester once for a subject
+                if ($subjectResult['Semester'] === null) {
+                    $subjectResult['Semester'] = $grade->semester; // Set the semester value
+                }
+                // Set the grades for the corresponding terms
                 $subjectResult[$grade->term] = $grade->grade;
             }
             $result[$subject] = $subjectResult;
@@ -830,6 +923,68 @@ class AuthController extends Controller
             ['grades' => $result]
         ];
     }
+
+      // public function getGrades($lrn, $syr) {
+    //     // Fetch student information
+    //     $student = DB::table('students')
+    //         ->where('LRN', '=', $lrn)
+    //         ->first();
+    
+    //     $enrollments = DB::table('enrollments')
+    //         ->where('LRN', '=', $lrn)
+    //         ->first();
+        
+    //     // Fetch subjects with grades (if available) and join with necessary tables
+    //     $grades = DB::table('subjects')
+    //     ->leftJoin('classes', 'subjects.subject_id', '=', 'classes.subject_id')
+    //     ->leftJoin('rosters', 'classes.class_id', '=', 'rosters.roster_id')
+    //     ->leftJoin('grades', function ($join) use ($lrn) {
+    //         $join->on('grades.class_id', '=', 'classes.class_id')
+    //              ->where('grades.LRN', '=', $lrn);
+    //     })
+    //     ->leftJoin('sections', 'classes.section_id', '=', 'sections.section_id')
+    //     ->where('sections.grade_level', '=', $enrollments->grade_level)
+    //     ->select('sections.*', 'subjects.subject_name', 'grades.grade', 'grades.term', 'classes.*', 'classes.semester')
+    //     ->get()
+    //     ->groupBy(['semester', 'subject_name']); // Group by semester and subject name
+    
+        
+    //     $result = [];
+    //     foreach ($grades as $semester => $semesterGrades) {
+    //         $semesterResult = [];
+    //         foreach ($semesterGrades as $subject => $subjectGrades) {
+    //             $subjectResult = [
+    //                 'First Quarter' => null,
+    //                 'Second Quarter' => null,
+    //                 'Third Quarter' => null,
+    //                 'Fourth Quarter' => null,
+    //                 'Midterm' => null,
+    //                 'Final' => null
+    //             ];
+    //             foreach ($subjectGrades as $grade) {
+    //                 $subjectResult[$grade->term] = $grade->grade;
+    //             }
+    //             $semesterResult[$subject] = $subjectResult;
+    //         }
+    //         $result[$semester] = $semesterResult;
+    //     }
+
+    
+    //     // Construct student info
+    //     $studentInfo = [
+    //         'full_name' => trim($student->fname . ' ' . $student->lname), // Combine first and last name
+    //         'strand' => $enrollments->strand,
+    //         'grade_level' => $enrollments->grade_level,
+    //         'LRN' => $lrn, // Include the LRN
+    //         'school_year' => $syr // Include the school year
+    //     ];
+        
+    //     // Return both student info and grades
+    //     return [
+    //         'student' => $studentInfo,
+    //         'grades_by_semester' => $result
+    //     ];
+    // }
 
     public function getGradesTP(Request $request) {
         $grades = DB::table('grades')->select('term', 'permission')->get();
@@ -934,6 +1089,56 @@ class AuthController extends Controller
         return response()->json($accounts);
     }
 
+    // public function markAsRead($messageId) {
+    //     DB::table('messages')
+    //         ->where('message_id', $messageId)
+    //         ->update(['read_at' => now()]); // Set the read_at timestamp to the current time
+    // }
+
+    // public function markAsRead(Request $request) {
+    //     $sid = $request->input('sid');
+    //     $messageId = $request->input('uid');
+
+    //     $read = DB::table('messages')
+    //         // ->where('message_id', $messageId)
+    //         ->where(function($query) use ($sid) {
+    //             $query->where('messages.message_sender', '=', $sid) // Messages sent by the sender
+    //                   ->orWhere('messages.message_reciever', '=', $sid); // Messages received by the sender
+    //         })
+    //         ->update(['read_at' => now()]); // Set the read_at timestamp to the current time
+
+    //     return $read;
+    // }
+
+
+    public function markAsRead(Request $request) {
+        $sid = $request->input('sid'); // The ID of the user whose messages are being marked as read
+
+        // Update the read_at timestamp for all messages involving the user
+        $read = DB::table('messages')
+            ->where(function($query) use ($sid) {
+                $query->where('messages.message_sender', '=', $sid) // Messages sent by the user
+                      ->orWhere('messages.message_reciever', '=', $sid); // Messages received by the user
+            })
+            ->update(['read_at' => now()]); // Set the read_at timestamp to the current time
+    
+        return response()->json(['success' => true, 'updated_count' => $read]);
+    }
+
+    public function getUnreadCount(Request $request)
+    {
+        $uid = $request->input('uid'); // Get the user ID from the request
+
+        // Count unread messages for the user
+        $unreadCount = DB::table('messages')
+            ->where('message_reciever', $uid)
+            ->where('read_at', null)
+            ->count();
+
+        // return response()->json(['unread_count' => $unreadCount]);
+        return $unreadCount;
+    }
+
     public function getMessages(Request $request) {
         $uid = $request->input('uid');
     
@@ -978,13 +1183,67 @@ class AuthController extends Controller
                                 IFNULL(CONCAT(" ", LEFT(parent_guardians.mname, 1), "."), ""), 
                                 " ", 
                                 parent_guardians.lname)
-                    END as sender_name'))
+                    END as sender_name'),
+                // DB::raw('IF(messages.read_at IS NULL, 0, 1) as is_read')
+                ) // Add is_read field
             ->havingRaw('sender_name IS NOT NULL')
             ->orderBy('messages.created_at', 'desc')
             ->get();
         
         return $msg;
     }
+
+    // public function getMessages(Request $request) {
+    //     $uid = $request->input('uid');
+    
+    //     // Main query to get messages for the entire conversation
+    //     $msg = DB::table('messages')
+    //         ->leftJoin('students', function ($join) {
+    //             $join->on('messages.message_sender', '=', 'students.LRN');
+    //         })
+    //         ->leftJoin('admins', function ($join) {
+    //             $join->on('messages.message_sender', '=', 'admins.admin_id');
+    //         })
+    //         ->leftJoin('parent_guardians', function ($join) {
+    //             $join->on('messages.message_sender', '=', 'parent_guardians.guardian_id');
+    //         })
+    //         ->leftJoin('students as receiver_students', function ($join) {
+    //             $join->on('messages.message_reciever', '=', 'receiver_students.LRN');
+    //         })
+    //         ->leftJoin('admins as receiver_admins', function ($join) {
+    //             $join->on('messages.message_reciever', '=', 'receiver_admins.admin_id');
+    //         })
+    //         ->leftJoin('parent_guardians as receiver_guardians', function ($join) {
+    //             $join->on('messages.message_reciever', '=', 'receiver_guardians.guardian_id');
+    //         })
+    //         ->where(function($query) use ($uid) {
+    //             $query->where('messages.message_sender', '=', $uid) // Messages sent by the user
+    //                   ->orWhere('messages.message_reciever', '=', $uid); // Messages received by the user
+    //         })
+    //         ->select('messages.*', 
+    //             DB::raw('CASE 
+    //                     WHEN messages.message_sender IN (SELECT LRN FROM students) THEN 
+    //                         CONCAT(students.fname, 
+    //                             IFNULL(CONCAT(" ", LEFT(students.mname, 1), "."), ""), 
+    //                             " ", 
+    //                             students.lname)
+    //                     WHEN messages.message_sender IN (SELECT admin_id FROM admins) THEN 
+    //                         CONCAT(receiver_students.fname, 
+    //                             IFNULL(CONCAT(" ", LEFT(receiver_students.mname, 1), "."), ""), 
+    //                             " ", 
+    //                             receiver_students.lname)
+    //                     WHEN messages.message_sender IN (SELECT guardian_id FROM parent_guardians) THEN 
+    //                         CONCAT(parent_guardians.fname, 
+    //                             IFNULL(CONCAT(" ", LEFT(parent_guardians.mname, 1), "."), ""), 
+    //                             " ", 
+    //                             parent_guardians.lname)
+    //                 END as sender_name'))
+    //         ->havingRaw('sender_name IS NOT NULL')
+    //         ->orderBy('messages.created_at', 'desc')
+    //         ->get();
+        
+    //     return $msg;
+    // }
 
     public function getConvo(Request $request, $sid) {
         // Initialize the response variable
