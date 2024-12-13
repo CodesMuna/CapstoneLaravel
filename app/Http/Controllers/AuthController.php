@@ -1184,7 +1184,7 @@ class AuthController extends Controller
                                 " ", 
                                 parent_guardians.lname)
                     END as sender_name'),
-                // DB::raw('IF(messages.read_at IS NULL, 0, 1) as is_read')
+                DB::raw('IF(messages.read_at IS NULL, 0, 1) as is_read')
                 ) // Add is_read field
             ->havingRaw('sender_name IS NOT NULL')
             ->orderBy('messages.created_at', 'desc')
