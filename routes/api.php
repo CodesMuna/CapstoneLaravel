@@ -11,26 +11,11 @@ Route::get('/user', function (Request $request) {
     return $request->user();
 })->middleware('auth:sanctum');
 
-// Route::middleware(['auth'])->group(function(){
-//     Route::view('/dashboard');
-
-//     Route::middleware(['admin'])->group(function(){
-
-//     }); ([])
-// });
-
-
-
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login']);
 
-
-// Route::apiResource('admins', AdminController::class);
-// Route::apiResource('students', StudentController::class);
-
-
-// Route::middleware(['auth:sanctum'])->group(function () {
-//     Route::middleware(['Registrar'])->group(function () {
+Route::middleware(['auth:sanctum'])->group(function () {
+    Route::middleware(['Registrar'])->group(function () {
 
         Route::post('/logout', [AuthController::class, 'logout'])->middleware('auth:sanctum');
 
@@ -61,12 +46,9 @@ Route::post('/login', [AuthController::class, 'login']);
 
         //Rostering Routes
 
-        // Route::get('/getClassInfo/{cid}', [AuthController::class, 'getClassInfo']);
         Route::get('/getClassInfo', [AuthController::class, 'getClassInfo']);
-        // Route::get('/getRosterInfo/{cid}', [AuthController::class, 'getRosterInfo']);
         Route::get('/getRosterInfo', [AuthController::class, 'getRosterInfo']);
         Route::post('/addStudent', [AuthController::class, 'addStudent']);
-        // Route::delete('/removeStudent/{rid}', [AuthController::class, 'removeStudent']);
         Route::delete('/removeStudent', [AuthController::class, 'removeStudent']);
         Route::get('/getEnrolees', [AuthController::class, 'getEnrolees']);
 
@@ -74,6 +56,7 @@ Route::post('/login', [AuthController::class, 'login']);
 
         //Grades Routes
 
+        Route::get('/getPending', [AuthController::class, 'getPending']);
         Route::get('/getClassGrades', [AuthController::class, 'getClassGrades']);
         Route::get('/allenrollments', [AuthController::class, 'allenrollments']);
         Route::get('/getSubjectRosters', [AuthController::class, 'getSubjectRosters']);
@@ -111,12 +94,8 @@ Route::post('/login', [AuthController::class, 'login']);
         
             abort(404);
         });
-//     });
-// });
-
-
-
-
+    });
+});
 
 // Enrollment/Students Routes
 
